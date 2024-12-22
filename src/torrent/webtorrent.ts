@@ -150,6 +150,7 @@ export const getOrAddTorrent = (uri: string) =>
     );
 
     const timeout = setTimeout(() => {
+      console.log(`Failed to add torrent: ${uri}`);
       torrent.destroy();
       resolve(undefined);
     }, TORRENT_TIMEOUT);
@@ -263,7 +264,7 @@ export const saveOrGetTorrentFile = async (uri: string, filePath: string) => {
 
   if (KEEP_TORRENT_FILES) {
     const torrentPath = path.join(TORRENT_FILE_DIR, torrentFilename);
-    if(fs.existsSync(torrentPath)) await fs.copy(seedPath, torrentPath);
+    if (!fs.existsSync(torrentPath)) await fs.copy(seedPath, torrentPath);
   }
 
   return seedPath;

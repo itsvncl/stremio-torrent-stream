@@ -2,7 +2,7 @@ import { Manifest } from "stremio-addon-sdk";
 
 export const manifest: Manifest = {
   id: "community.torrent-stream-plus",
-  version: "1.1.1",
+  version: "1.1.2",
   catalogs: [],
   resources: ["stream"],
   types: ["movie", "series"],

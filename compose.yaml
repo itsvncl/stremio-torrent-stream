@@ -1,10 +1,24 @@
 services:
   stremio-addon-server:
-    image: nyakaspeter/stremio-torrent-stream:latest
-    container_name: stremio-addon-server
+    image: itsvncl/stremio-torrent-stream-plus:latest
+    container_name: stremio-torrent
     ports:
       - 58827:58827
       - 58828:58828
+    environment:
+      - NODE_ENV=production
+      - HTTPS_METHOD=local-ip.medicmobile.org
+      - DOWNLOAD_DIR=/data
+      - KEEP_DOWNLOADED_FILES=true
+      - MAX_CONNS_PER_TORRENT=50
+      - DOWNLOAD_SPEED_LIMIT=20971520
+      - UPLOAD_SPEED_LIMIT=1048576
+      - SEED_TIME=259200000
+      - TORRENT_TIMEOUT=10000
+      - AUTO_SEED=true
+      - KEEP_TORRENT_FILES=true
+      - TORRENT_FILE_DIR=/data/torrents
+      - SEED_DIR=/data/seed
     restart: unless-stopped
 
   jackett:
