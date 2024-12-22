@@ -1,12 +1,12 @@
 import { Manifest } from "stremio-addon-sdk";
 
 export const manifest: Manifest = {
-  id: "community.torrent-stream",
-  version: "1.0.0",
+  id: "community.torrent-stream-plus",
+  version: "1.1.1",
   catalogs: [],
   resources: ["stream"],
   types: ["movie", "series"],
-  name: "Torrent Stream",
+  name: "Torrent Stream +",
   logo: "https://upload.wikimedia.org/wikipedia/en/7/79/WebTorrent_logo.png",
   background:
     "https://i.etsystatic.com/35367581/r/il/53bf97/4463935832/il_fullxfull.4463935832_3k3g.jpg",
