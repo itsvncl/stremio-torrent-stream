@@ -9,7 +9,7 @@ import {
 import { getTorrentInfo } from "../torrent/webtorrent.js";
 import { getReadableSize, isSubtitleFile, isVideoFile } from "../utils/file.js";
 import { getTitles } from "../utils/imdb.js";
-import { guessLanguage } from "../utils/language.js";
+import { guessLanguages } from "../utils/language.js";
 import { guessQuality } from "../utils/quality.js";
 import { isFileNameMatch, isTorrentNameMatch } from "../utils/shows.js";
 
@@ -165,7 +165,7 @@ export const getStreamsFromTorrent = async (
   const subs = torrentInfo.files.filter((file) => isSubtitleFile(file.name));
 
   const torrentQuality = guessQuality(torrent.name);
-  const language = guessLanguage(torrent.name, torrent.category);
+  const languages = guessLanguages(torrent.name, torrent.category);
 
   // @ts-ignore
   return videos.map((file) => {
@@ -181,7 +181,7 @@ export const getStreamsFromTorrent = async (
         `⬆️ ${torrent.seeds}`,
         `⬇️ ${torrent.peers}`,
       ].join(" "),
-      [`🔊 ${language}`, `⚙️ ${torrent.tracker}`].join(" "),
+      [`⚙️ ${torrent.tracker}`, `🔊 ${languages}`].join(" "),
     ].join("\n");
 
     const streamEndpoint = `${req.protocol}://${req.get("host")}/stream`;

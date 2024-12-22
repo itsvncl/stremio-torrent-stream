@@ -1,16 +1,31 @@
-export const guessLanguage = (name: string, category?: string) => {
-  if (category?.includes("HU")) return "Hungarian";
+export const guessLanguages = (name: string, category?: string) => {
+  const languages = new Set();
+  if (category?.includes("HU")) languages.add("🇭🇺");
+  if (category?.includes("EN")) languages.add("🇬🇧");
 
-  const split = name
-    .toLowerCase()
-    .replace(/\W/g, " ")
-    .replace("x", " ")
-    .split(" ");
+  const languageMap: { [key: string]: string } = {
+    hun: "🇭🇺",
+    hungarian: "🇭🇺",
+    ger: "🇩🇪",
+    german: "🇩🇪",
+    fre: "🇫🇷",
+    french: "🇫🇷",
+    ita: "🇮🇹",
+    italian: "🇮🇹",
+    eng: "🇬🇧",
+    english: "🇬🇧",
+    rus: "🇷🇺",
+    russian: "🇷🇺",
+    spa: "🇪🇸",
+    spanish: "🇪🇸",
+    multi: "🌍",
+  };
 
-  if (split.includes("hun") || split.includes("hungarian")) return "Hungarian";
-  if (split.includes("ger") || split.includes("german")) return "German";
-  if (split.includes("fre") || split.includes("french")) return "French";
-  if (split.includes("ita") || split.includes("italian")) return "Italian";
+  const regex = new RegExp(Object.keys(languageMap).join("|"), "gi");
+  const matches = name.toLowerCase().match(regex);
 
-  return "English";
+  if (matches) matches.forEach((match) => languages.add(languageMap[match]));
+  else languages.add("🇬🇧");
+
+  return [...languages].join("/");
 };
