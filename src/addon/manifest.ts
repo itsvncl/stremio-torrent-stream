@@ -2,7 +2,7 @@ import { Manifest } from "stremio-addon-sdk";
 
 export const manifest: Manifest = {
   id: "community.torrent-stream-plus",
-  version: "1.1.2",
+  version: "1.1.3",
   catalogs: [],
   resources: ["stream"],
   types: ["movie", "series"],
@@ -19,6 +19,11 @@ export const manifest: Manifest = {
     configurationRequired: true,
   },
   config: [
+    {
+      title: "Stream host",
+      key: "streamHost",
+      type: "text",
+    },
     {
       title: "Enable Jackett search",
       key: "enableJackett",

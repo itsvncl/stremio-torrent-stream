@@ -18,6 +18,7 @@ interface HandlerArgs {
   type: string;
   id: string;
   config?: {
+    streamHost: string;
     enableJackett: string;
     jackettUrl: string;
     jackettKey: string;
@@ -105,7 +106,7 @@ export const streamHandler = async ({ type, id, config, req }: HandlerArgs) => {
   let streams = (
     await Promise.all(
       torrents.map((torrent) =>
-        getStreamsFromTorrent(req, torrent, season, episode)
+        getStreamsFromTorrent(req, config.streamHost, torrent, season, episode)
       )
     )
   ).flat();
@@ -131,6 +132,7 @@ const dedupeTorrents = (torrents: TorrentSearchResult[]) => {
 
 export const getStreamsFromTorrent = async (
   req: Request,
+  streamHost: string,
   torrent: TorrentSearchResult,
   season?: string,
   episode?: string
@@ -191,7 +193,7 @@ export const getStreamsFromTorrent = async (
       [`⚙️ ${torrent.tracker}`, `🔊 ${languages}`].join(" "),
     ].join("\n");
 
-    const streamEndpoint = `${req.protocol}://${req.get("host")}/stream`;
+    const streamEndpoint = `${streamHost}/stream`;
 
     const url = [
       streamEndpoint,
