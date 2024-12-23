@@ -193,7 +193,9 @@ export const getStreamsFromTorrent = async (
       [`⚙️ ${torrent.tracker}`, `🔊 ${languages}`].join(" "),
     ].join("\n");
 
-    const streamEndpoint = `${streamHost}/stream`;
+    const streamEndpoint = streamHost
+      ? `${streamHost}/stream`
+      : `${req.protocol}://${req.get("host")}/stream`;
 
     const url = [
       streamEndpoint,
