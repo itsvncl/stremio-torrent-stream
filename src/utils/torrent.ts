@@ -1,5 +1,7 @@
 import { TorrentInfo } from "../torrent/webtorrent.js";
 import { createHash } from "crypto";
+import { TORRENT_FILE_DIR } from "../torrent/constats.js";
+import fs from "fs-extra";
 import bencode from "bencode";
 import path from "path";
 
@@ -47,4 +49,15 @@ export const getTorrentHash = async (
     .update(bencode.encode(metadata.info))
     .digest("hex");
   return infoHash;
+};
+
+export const torrentFileExists = (fileName: string): boolean => {
+  const filePath = path.join(TORRENT_FILE_DIR, fileName + ".torrent");
+  console.log(`Checking if torrent file exists: ${filePath}`);
+  try {
+    return fs.pathExistsSync(filePath);
+  } catch (error) {
+    console.error(`Error checking if file exists: ${error.message}`);
+    return false;
+  }
 };

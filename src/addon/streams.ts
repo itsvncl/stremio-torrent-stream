@@ -13,6 +13,7 @@ import { guessLanguages } from "../utils/language.js";
 import { guessQuality } from "../utils/quality.js";
 import { isFileNameMatch, isTorrentNameMatch } from "../utils/shows.js";
 import { getTorrentInfoFromTorrentFile } from "../utils/torrent.js";
+import { torrentFileExists } from "../utils/torrent.js";
 
 interface HandlerArgs {
   type: string;
@@ -183,6 +184,7 @@ export const getStreamsFromTorrent = async (
     const { quality, score } =
       fileQuality.score > torrentQuality.score ? fileQuality : torrentQuality;
 
+    const isCached = torrentFileExists(torrentInfo.name);
     const description = [
       ...(season && episode ? [torrent.name, file.name] : [torrent.name]),
       [
@@ -215,7 +217,7 @@ export const getStreamsFromTorrent = async (
 
     return {
       stream: {
-        name: quality,
+        name: isCached ? "⚡\n" + quality : quality,
         description,
         url,
         subtitles,
@@ -226,7 +228,7 @@ export const getStreamsFromTorrent = async (
       torrentName: torrent.name,
       fileName: file.name,
       quality,
-      score,
+      score: isCached ? score + 999999 : score,
     };
   });
 };

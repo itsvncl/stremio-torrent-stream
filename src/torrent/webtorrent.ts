@@ -1,10 +1,22 @@
 import fs from "fs-extra";
 import MemoryStore from "memory-chunk-store";
-import os from "os";
 import path from "path";
 import WebTorrent, { Torrent } from "webtorrent";
 import { getReadableDuration } from "../utils/file.js";
 import { getTorrentHash } from "../utils/torrent.js";
+import {
+  DOWNLOAD_DIR,
+  TORRENT_FILE_DIR,
+  SEED_DIR,
+  AUTO_SEED,
+  KEEP_DOWNLOADED_FILES,
+  KEEP_TORRENT_FILES,
+  MAX_CONNS_PER_TORRENT,
+  DOWNLOAD_SPEED_LIMIT,
+  UPLOAD_SPEED_LIMIT,
+  SEED_TIME,
+  TORRENT_TIMEOUT,
+} from "./constats.js";
 
 interface FileInfo {
   name: string;
@@ -35,52 +47,6 @@ interface ActiveTorrentInfo extends TorrentInfo {
   openStreams: number;
   files: ActiveFileInfo[];
 }
-
-// Directory to store downloaded files (default OS temp directory)
-const DOWNLOAD_DIR =
-  process.env.DOWNLOAD_DIR || path.join(os.tmpdir(), "torrent-stream-server");
-
-// Directory to store torrent files (default DOWNLOAD_DIR/torrents)
-const TORRENT_FILE_DIR =
-  process.env.TORRENT_FILE_DIR || path.join(DOWNLOAD_DIR, "torrents");
-
-// Directory to store torrent files that didn't complete their seed period (default DOWNLOAD_DIR/seed)
-const SEED_DIR = process.env.SEED_DIR || path.join(DOWNLOAD_DIR, "seed");
-
-// Enables automatic seeding of torrents that were left in the SEED_DIR (default false)
-// A torrent file stay in the SEED_DIR if the SEED_TIME has not passed, I recommend keeping this enabled
-const AUTO_SEED = process.env.AUTO_SEED
-  ? process.env.AUTO_SEED === "true"
-  : false;
-
-// Keep downloaded files after all streams are closed (default false)
-const KEEP_DOWNLOADED_FILES = process.env.KEEP_DOWNLOADED_FILES
-  ? process.env.KEEP_DOWNLOADED_FILES === "true"
-  : false;
-
-// Keep torrent files (default false)
-const KEEP_TORRENT_FILES = process.env.KEEP_TORRENT_FILES
-  ? process.env.KEEP_TORRENT_FILES === "true"
-  : false;
-
-if (!KEEP_DOWNLOADED_FILES) fs.emptyDirSync(DOWNLOAD_DIR);
-
-// Maximum number of connections per torrent (default 50)
-const MAX_CONNS_PER_TORRENT = Number(process.env.MAX_CONNS_PER_TORRENT) || 50;
-
-// Max download speed (bytes/s) over all torrents (default 20MB/s)
-const DOWNLOAD_SPEED_LIMIT =
-  Number(process.env.DOWNLOAD_SPEED_LIMIT) || 20 * 1024 * 1024;
-
-// Max upload speed (bytes/s) over all torrents (default 1MB/s)
-const UPLOAD_SPEED_LIMIT =
-  Number(process.env.UPLOAD_SPEED_LIMIT) || 1 * 1024 * 1024;
-
-// Time (ms) to seed torrents after all streams are closed (default 1 minute)
-const SEED_TIME = Number(process.env.SEED_TIME) || 60 * 1000;
-
-// Timeout (ms) when adding torrents if no metadata is received (default 5 seconds)
-const TORRENT_TIMEOUT = Number(process.env.TORRENT_TIMEOUT) || 5 * 1000;
 
 const infoClient = new WebTorrent();
 const streamClient = new WebTorrent({

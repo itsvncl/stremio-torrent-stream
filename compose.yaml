@@ -7,7 +7,7 @@ services:
       - 58828:58828
     environment:
       - NODE_ENV=production
-      - HTTPS_METHOD=local-ip.medicmobile.org
+      - HTTPS_METHOD=none
       - DOWNLOAD_DIR=/data
       - KEEP_DOWNLOADED_FILES=true
       - MAX_CONNS_PER_TORRENT=50
