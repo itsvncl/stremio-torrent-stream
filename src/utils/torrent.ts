@@ -53,7 +53,6 @@ export const getTorrentHash = async (
 
 export const torrentFileExists = (fileName: string): boolean => {
   const filePath = path.join(TORRENT_FILE_DIR, fileName + ".torrent");
-  console.log(`Checking if torrent file exists: ${filePath}`);
   try {
     return fs.pathExistsSync(filePath);
   } catch (error) {

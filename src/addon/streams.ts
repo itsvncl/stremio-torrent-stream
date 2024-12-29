@@ -150,11 +150,17 @@ export const getStreamsFromTorrent = async (
   if (!uri) return [];
 
   let torrentInfo;
-  if (uri == torrent.torrent) {
-    torrentInfo = await getTorrentInfoFromTorrentFile(uri);
-  } else {
-    torrentInfo = await getTorrentInfoFromWebtorrent(uri);
+  try {
+    if (uri === torrent.torrent) {
+      torrentInfo = await getTorrentInfoFromTorrentFile(uri);
+    } else {
+      torrentInfo = await getTorrentInfoFromWebtorrent(uri);
+    }
+  } catch (e: unknown) {
+    console.error("Error durring torrent info fetching: ", e);
+    return [];
   }
+
 
   if (!torrentInfo) return [];
 

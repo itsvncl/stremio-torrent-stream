@@ -256,6 +256,7 @@ export const seedDirectory = async () => {
     if (timeout) return;
 
     if (path.extname(filePath) === ".torrent") {
+      console.log(`Initializing torrent for seeding: ${file}`)
       streamClient.add(filePath, { path: DOWNLOAD_DIR }, (_) => {
         console.log(`Seeding torrent: ${file}`);
         timeout = setTimeout(() => handleTorrentTimeout(hash), SEED_TIME);
