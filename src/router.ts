@@ -53,8 +53,8 @@ router.get("/torrent/:torrentUri", async (req, res) => {
   res.json(torrent);
 });
 
-router.get("/stream/:torrentUri/:filePath", async (req, res) => {
-  const { torrentUri, filePath } = req.params;
+router.get("/stream/:infoHash/:torrentUri/:filePath/", async (req, res) => {
+  const { infoHash, torrentUri, filePath } = req.params;
 
   if(KEEP_DOWNLOADED_FILES && KEEP_TORRENT_FILES && isTorrentStoredLocally(filePath)) {
     console.log(`Torrent is stored locally, redirecting to file stream: ${filePath}`);
@@ -67,13 +67,13 @@ router.get("/stream/:torrentUri/:filePath", async (req, res) => {
     : await saveOrGetTorrentFile(torrentUri, filePath);
 
   console.log(`Torrent is not stored locally, redirecting to torrent stream: ${uri}/${filePath}`);
-  res.redirect(301, `/torrent-stream/${encodeURIComponent(uri)}/${encodeURIComponent(filePath)}`);
+  res.redirect(301, `/torrent-stream/${encodeURIComponent(infoHash)}/${encodeURIComponent(uri)}/${encodeURIComponent(filePath)}`);
 });
 
-router.get("/torrent-stream/:torrentUri/:filePath", async (req, res) => {
-  const { torrentUri, filePath } = req.params;
+router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) => {
+  const { infoHash, torrentUri, filePath } = req.params;
 
-  const torrent = await getOrAddTorrent(torrentUri);
+  const torrent = await getOrAddTorrent(torrentUri, infoHash);
   if (!torrent) return res.status(500).send("Failed to add torrent");
 
   const file = getFile(torrent, filePath);

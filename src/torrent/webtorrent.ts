@@ -99,25 +99,29 @@ export const getStats = () => ({
   })),
 });
 
-export const getOrAddTorrent = (uri: string) =>
-  new Promise<Torrent | undefined>((resolve) => {
+export const getOrAddTorrent = (uri: string, infoHash: string = "") =>
+  new Promise<Torrent | undefined>(async (resolve) => {
+    const existingTorrent = await streamClient.get(infoHash);
+    if (existingTorrent) {
+      console.log(`Torrent already exists: ${infoHash}, using it for stream.`);
+      resolve(existingTorrent);
+      return;
+    }
+
     const options = {
       path: DOWNLOAD_DIR,
       destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
-    }
+    };
 
-    if(!KEEP_DOWNLOADED_FILES){
-      console.log("Optimized for streaming, download stops after stream is closed")
+    if (!KEEP_DOWNLOADED_FILES) {
       options["deselect"] = true;
     }
-    const torrent = streamClient.add(
-      uri,
-      options,
-      (torrent) => {
-        clearTimeout(timeout);
-        resolve(torrent);
-      }
-    );
+
+    console.log(`Torrent doesn't exists: ${infoHash}, adding ${uri}`);
+    const torrent = streamClient.add(uri, options, (torrent) => {
+      clearTimeout(timeout);
+      resolve(torrent);
+    });
 
     const timeout = setTimeout(() => {
       console.log(`Failed to add torrent: ${uri}`);

@@ -6,7 +6,7 @@ import {
   TorrentSource,
   searchTorrents,
 } from "../torrent/search.js";
-import { getTorrentInfoFromWebtorrent } from "../torrent/webtorrent.js";
+import { getTorrentInfoFromWebtorrent, TorrentInfo } from "../torrent/webtorrent.js";
 import { getReadableSize, isSubtitleFile, isVideoFile } from "../utils/file.js";
 import { getTitles } from "../utils/imdb.js";
 import { guessLanguages } from "../utils/language.js";
@@ -149,7 +149,7 @@ export const getStreamsFromTorrent = async (
   const uri = torrent.torrent || torrent.magnet;
   if (!uri) return [];
 
-  let torrentInfo;
+  let torrentInfo: TorrentInfo | undefined;
   try {
     if (uri === torrent.torrent) {
       torrentInfo = await getTorrentInfoFromTorrentFile(uri);
@@ -207,6 +207,7 @@ export const getStreamsFromTorrent = async (
 
     const url = [
       streamEndpoint,
+      encodeURIComponent(torrentInfo.infoHash),
       encodeURIComponent(uri),
       encodeURIComponent(file.path),
     ].join("/");
@@ -215,6 +216,7 @@ export const getStreamsFromTorrent = async (
       id: index.toString(),
       url: [
         streamEndpoint,
+        encodeURIComponent(torrentInfo.infoHash),
         encodeURIComponent(uri),
         encodeURIComponent(sub.path),
       ].join("/"),
