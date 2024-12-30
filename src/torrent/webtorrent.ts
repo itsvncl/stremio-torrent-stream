@@ -101,14 +101,18 @@ export const getStats = () => ({
 
 export const getOrAddTorrent = (uri: string) =>
   new Promise<Torrent | undefined>((resolve) => {
+    const options = {
+      path: DOWNLOAD_DIR,
+      destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
+    }
+
+    if(!KEEP_DOWNLOADED_FILES){
+      console.log("Optimized for streaming, download stops after stream is closed")
+      options["deselect"] = true;
+    }
     const torrent = streamClient.add(
       uri,
-      {
-        path: DOWNLOAD_DIR,
-        destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
-        // @ts-ignore
-        deselect: true,
-      },
+      options,
       (torrent) => {
         clearTimeout(timeout);
         resolve(torrent);

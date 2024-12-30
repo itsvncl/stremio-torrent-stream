@@ -9,7 +9,11 @@ import {
   streamOpened,
   saveOrGetTorrentFile,
 } from "./torrent/webtorrent.js";
+import { isTorrentStoredLocally } from "./utils/torrent.js";
 import { getStreamingMimeType } from "./utils/file.js";
+import { DOWNLOAD_DIR, KEEP_DOWNLOADED_FILES, KEEP_TORRENT_FILES } from "./torrent/constats.js";
+import fs from "fs-extra";
+import path from "path";
 
 export const router = Router();
 
@@ -52,11 +56,24 @@ router.get("/torrent/:torrentUri", async (req, res) => {
 router.get("/stream/:torrentUri/:filePath", async (req, res) => {
   const { torrentUri, filePath } = req.params;
 
+  if(KEEP_DOWNLOADED_FILES && KEEP_TORRENT_FILES && isTorrentStoredLocally(filePath)) {
+    console.log(`Torrent is stored locally, redirecting to file stream: ${filePath}`);
+    res.redirect(301, `/file-stream/${encodeURIComponent(path.join(DOWNLOAD_DIR, filePath))}`);
+    return;
+  }
+
   const uri = torrentUri.startsWith("magnet")
     ? torrentUri
     : await saveOrGetTorrentFile(torrentUri, filePath);
 
-  const torrent = await getOrAddTorrent(uri);
+  console.log(`Torrent is not stored locally, redirecting to torrent stream: ${uri}/${filePath}`);
+  res.redirect(301, `/torrent-stream/${encodeURIComponent(uri)}/${encodeURIComponent(filePath)}`);
+});
+
+router.get("/torrent-stream/:torrentUri/:filePath", async (req, res) => {
+  const { torrentUri, filePath } = req.params;
+
+  const torrent = await getOrAddTorrent(torrentUri);
   if (!torrent) return res.status(500).send("Failed to add torrent");
 
   const file = getFile(torrent, filePath);
@@ -113,5 +130,50 @@ router.get("/stream/:torrentUri/:filePath", async (req, res) => {
     });
   } catch (error) {
     res.status(500).end();
+  }
+});
+
+router.get("/file-stream/:filePath", async (req, res) => {
+  const { filePath } = req.params;
+  const fullPath = decodeURIComponent(filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).send("File not found");
+  }
+
+  const { range } = req.headers;
+  const stats = fs.statSync(fullPath);
+  const fileSize = stats.size;
+
+  if (range) {
+    const positions = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(positions[0], 10);
+    const end = positions[1] ? parseInt(positions[1], 10) : fileSize - 1;
+
+    if (start >= fileSize || end >= fileSize) {
+      res.writeHead(416, {
+        "Content-Range": `bytes */${fileSize}`,
+      });
+      return res.end();
+    }
+
+    const chunkSize = end - start + 1;
+    const fileStream = fs.createReadStream(fullPath, { start, end });
+
+    const headers = {
+      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": chunkSize,
+      "Content-Type": getStreamingMimeType(fullPath),
+    };
+
+    res.writeHead(206, headers);
+    fileStream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      "Content-Length": fileSize,
+      "Content-Type": getStreamingMimeType(fullPath),
+    });
+    fs.createReadStream(fullPath).pipe(res);
   }
 });

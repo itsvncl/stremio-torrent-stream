@@ -1,7 +1,7 @@
 import { TorrentInfo } from "../torrent/webtorrent.js";
 import { createHash } from "crypto";
-import { TORRENT_FILE_DIR } from "../torrent/constats.js";
-import fs from "fs-extra";
+import { TORRENT_FILE_DIR, SEED_DIR, DOWNLOAD_DIR } from "../torrent/constats.js";
+import fs, { pathExists } from "fs-extra";
 import bencode from "bencode";
 import path from "path";
 
@@ -60,3 +60,13 @@ export const torrentFileExists = (fileName: string): boolean => {
     return false;
   }
 };
+
+export const isTorrentStoredLocally = (filePath: string) => {
+  const rootFolder = path.normalize(filePath).split(path.sep)[0];
+  const torrentFilename = `${rootFolder}.torrent`;
+  
+  const seedPath = path.join(SEED_DIR, torrentFilename);
+  const torrentPath = path.join(TORRENT_FILE_DIR, torrentFilename);
+
+  return !fs.existsSync(seedPath) && fs.existsSync(torrentPath) && fs.existsSync(path.join(DOWNLOAD_DIR, filePath));
+}
