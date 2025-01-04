@@ -2,7 +2,7 @@ import { Manifest } from "stremio-addon-sdk";
 
 export const manifest: Manifest = {
   id: "community.torrent-stream-plus",
-  version: "1.2.1",
+  version: "1.3.1",
   catalogs: [],
   resources: ["stream"],
   types: ["movie", "series"],
@@ -69,6 +69,12 @@ export const manifest: Manifest = {
       title: "iNSANE password",
       key: "insanePassword",
       type: "password",
+    },
+    {
+      title: "Enable subtitles",
+      key: "enableSubtitles",
+      type: "checkbox",
+      default: "checked",
     },
     {
       title: "Enable iTorrent search",

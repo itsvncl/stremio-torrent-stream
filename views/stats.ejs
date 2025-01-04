@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Stats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Convert Bytes to Mib/s
+        function bytesToMibps(bytesPerSecond) {
+            return (bytesPerSecond * 8 / (1024 * 1024)).toFixed(2); // Convert bytes/sec to Mib/s
+        }
+    
+        // Convert Bytes to GB
+        function bytesToGB(bytes) {
+            return (bytes / (1024 ** 3)).toFixed(2); // Convert bytes to GB
+        }
+    
+        async function fetchStats() {
+            try {
+                const response = await fetch('/data/stats'); // Assumes /stats returns your stats data as JSON.
+                const data = await response.json();
+                updateStats(data);
+            } catch (error) {
+                console.error("Error fetching stats:", error);
+            }
+        }
+    
+        function updateStats(data) {
+            // Update stats
+            document.getElementById('uptime').innerText = data.uptime;
+            document.getElementById('openStreams').innerText = data.openStreams;
+            document.getElementById('downloadSpeed').innerText = `${bytesToMibps(data.downloadSpeed)} Mib/s`;
+            document.getElementById('uploadSpeed').innerText = `${bytesToMibps(data.uploadSpeed)} Mib/s`;
+    
+            // Update active torrents
+            const torrentsContainer = document.getElementById('torrentsContainer');
+            torrentsContainer.innerHTML = ''; // Clear old torrents
+    
+            data.activeTorrents.forEach(torrent => {
+                const torrentElement = document.createElement('div');
+                torrentElement.classList.add('bg-gray-800', 'rounded-lg', 'p-6', 'mb-6', 'shadow-lg');
+                torrentElement.innerHTML = `
+                    <h3 class="text-lg font-bold text-gray-200 mb-3">
+                        ${torrent.name}<br><span class="text-sm font-normal text-gray-500">Info Hash: ${torrent.infoHash})</span>
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Size:</span> ${bytesToGB(torrent.size)} GB</p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Progress:</span> ${Math.round(torrent.progress * 100)}%</p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Downloaded:</span> ${bytesToGB(torrent.downloaded)} GB</p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Uploaded:</span> ${bytesToGB(torrent.uploaded)} GB</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Download Speed:</span> <span class="text-green-400">${bytesToMibps(torrent.downloadSpeed)} Mib/s</span></p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Upload Speed:</span> <span class="text-purple-400">${bytesToMibps(torrent.uploadSpeed)} Mib/s</span></p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Peers:</span> ${torrent.peers}</p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Open Streams:</span> ${torrent.openStreams}</p>
+                        </div>
+                    </div>
+                `;
+    
+                // Add Files
+                if (torrent.files.length > 0) {
+                    const filesTable = document.createElement('table');
+                    filesTable.classList.add('w-full', 'text-sm', 'text-gray-400');
+                    filesTable.innerHTML = `
+                        <thead>
+                            <tr class="bg-gray-700 text-gray-300">
+                                <th class="px-4 py-2 text-left">Name</th>
+                                <th class="px-4 py-2 text-left">Progress</th>
+                                <th class="px-4 py-2 text-left">Downloaded (GB)</th>
+                                <th class="px-4 py-2 text-left">Size (GB)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${torrent.files.map(file => `
+                                <tr class="border-t border-gray-700">
+                                    <td class="px-4 py-2">${file.name}</td>
+                                    <td class="px-4 py-2">${Math.round(file.progress * 100)}%</td>
+                                    <td class="px-4 py-2">${bytesToGB(file.downloaded)} GB</td>
+                                    <td class="px-4 py-2">${bytesToGB(file.size)} GB</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    `;
+                    torrentElement.appendChild(filesTable);
+                } else {
+                    const noFilesText = document.createElement('p');
+                    noFilesText.classList.add('text-red-500', 'mt-2');
+                    noFilesText.innerText = 'No files available.';
+                    torrentElement.appendChild(noFilesText);
+                }
+    
+                torrentsContainer.appendChild(torrentElement);
+            });
+        }
+    
+        // Fetch stats every second
+        setInterval(fetchStats, 1000);
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-300 font-sans">
+    <div class="container mx-auto p-6">
+        <!-- Header -->
+        <h1 class="text-4xl font-extrabold text-white mb-6">Streaming Stats</h1>
+
+        <!-- Stats -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8 shadow-lg">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-400">Uptime</span>
+                    <span class="text-lg font-semibold text-gray-200" id="uptime">Loading...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-400">Open Streams</span>
+                    <span class="text-lg font-semibold text-gray-200" id="openStreams">Loading...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-400">Download Speed</span>
+                    <span class="text-lg font-semibold text-green-400" id="downloadSpeed">Loading...</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-400">Upload Speed</span>
+                    <span class="text-lg font-semibold text-purple-400" id="uploadSpeed">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Torrents -->
+        <h2 class="text-2xl font-semibold text-white mb-4">Active Torrents</h2>
+        <div id="torrentsContainer">
+            <p class="text-gray-400">Loading torrents...</p>
+        </div>
+    </div>
+</body>
+</html>

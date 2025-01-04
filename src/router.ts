@@ -17,10 +17,15 @@ import path from "path";
 
 export const router = Router();
 
-router.get("/stats", (req, res) => {
+router.get("/stats", (_, res) => {
+  res.render("stats");
+});
+
+router.get("/data/stats", (_, res) => {
   const stats = getStats();
   res.json(stats);
 });
+
 
 router.get("/torrents/:query", async (req, res) => {
   const { query } = req.params;
@@ -53,6 +58,7 @@ router.get("/torrent/:torrentUri", async (req, res) => {
   res.json(torrent);
 });
 
+//Deprecated
 router.get("/stream/:infoHash/:torrentUri/:filePath/", async (req, res) => {
   const { infoHash, torrentUri, filePath } = req.params;
 
@@ -62,18 +68,18 @@ router.get("/stream/:infoHash/:torrentUri/:filePath/", async (req, res) => {
     return;
   }
 
-  const uri = torrentUri.startsWith("magnet")
-    ? torrentUri
-    : await saveOrGetTorrentFile(torrentUri, filePath);
-
-  console.log(`Torrent is not stored locally, redirecting to torrent stream: ${uri}/${filePath}`);
-  res.redirect(301, `/torrent-stream/${encodeURIComponent(infoHash)}/${encodeURIComponent(uri)}/${encodeURIComponent(filePath)}`);
+  console.log(`Torrent is not stored locally, redirecting to torrent stream: ${torrentUri}/${filePath}`);
+  res.redirect(301, `/torrent-stream/${encodeURIComponent(infoHash)}/${encodeURIComponent(torrentUri)}/${encodeURIComponent(filePath)}`);
 });
 
 router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) => {
   const { infoHash, torrentUri, filePath } = req.params;
 
-  const torrent = await getOrAddTorrent(torrentUri, infoHash);
+  const uri = torrentUri.startsWith("magnet")
+  ? torrentUri
+  : await saveOrGetTorrentFile(torrentUri, filePath);
+
+  const torrent = await getOrAddTorrent(uri, infoHash);
   if (!torrent) return res.status(500).send("Failed to add torrent");
 
   const file = getFile(torrent, filePath);
@@ -136,8 +142,11 @@ router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) =
 router.get("/file-stream/:filePath", async (req, res) => {
   const { filePath } = req.params;
   const fullPath = decodeURIComponent(filePath);
+  
+  console.log(`Streaming file: ${fullPath}`);
 
   if (!fs.existsSync(fullPath)) {
+    console.log(`File not found: ${fullPath}`);
     return res.status(404).send("File not found");
   }
 

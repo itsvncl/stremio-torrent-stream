@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cpx \"views/**/*\" dist/views",
     "start": "node --no-warnings dist/index.js",
     "dev": "esrun --node-no-warnings --watch src/index.ts"
   },
@@ -28,7 +28,9 @@
     "axios-cookiejar-support": "^4.0.7",
     "bencode": "^4.0.0",
     "cheerio": "1.0.0-rc.12",
+    "cpx": "^1.5.0",
     "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
     "express": "^4.19.2",
     "eztv-crawler": "^1.3.6",
     "fs-extra": "^11.2.0",
@@ -46,4 +48,4 @@
       "stremio-addon-sdk@1.6.10": "patches/stremio-addon-sdk@1.6.10.patch"
     }
   }
-} 
+}

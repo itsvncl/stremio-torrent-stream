@@ -14,6 +14,9 @@ import { guessQuality } from "../utils/quality.js";
 import { isFileNameMatch, isTorrentNameMatch } from "../utils/shows.js";
 import { getTorrentInfoFromTorrentFile } from "../utils/torrent.js";
 import { torrentFileExists } from "../utils/torrent.js";
+import { isTorrentStoredLocally } from "../utils/torrent.js";
+import { KEEP_DOWNLOADED_FILES, KEEP_TORRENT_FILES, DOWNLOAD_DIR } from "../torrent/constats.js";
+import path from "path";
 
 interface HandlerArgs {
   type: string;
@@ -29,6 +32,7 @@ interface HandlerArgs {
     enableInsane: string;
     insaneUser: string;
     insanePassword: string;
+    enableSubtitles: string;
     enableItorrent: string;
     enableYts: string;
     enableEztv: string;
@@ -56,6 +60,8 @@ export const streamHandler = async ({ type, id, config, req }: HandlerArgs) => {
   if (config.enableItorrent === "on") sources.push("itorrent");
   if (config.enableYts === "on") sources.push("yts");
   if (config.enableEztv === "on") sources.push("eztv");
+
+  const subs = config.enableSubtitles === "on"
 
   const [imdbId, season, episode] = id.split(":");
 
@@ -107,7 +113,7 @@ export const streamHandler = async ({ type, id, config, req }: HandlerArgs) => {
   let streams = (
     await Promise.all(
       torrents.map((torrent) =>
-        getStreamsFromTorrent(req, config.streamHost, torrent, season, episode)
+        getStreamsFromTorrent(req, config.streamHost, torrent, subs, season, episode)
       )
     )
   ).flat();
@@ -135,6 +141,7 @@ export const getStreamsFromTorrent = async (
   req: Request,
   streamHost: string,
   torrent: TorrentSearchResult,
+  subsEnabled: boolean,
   season?: string,
   episode?: string
 ): Promise<
@@ -201,27 +208,17 @@ export const getStreamsFromTorrent = async (
       [`⚙️ ${torrent.tracker}`, `🔊 ${languages}`].join(" "),
     ].join("\n");
 
-    const streamEndpoint = streamHost
-      ? `${streamHost}/stream`
-      : `${req.protocol}://${req.get("host")}/stream`;
+    const streamEndpointHost = streamHost
+      ? `${streamHost}`
+      : `${req.protocol}://${req.get("host")}`;
 
-    const url = [
-      streamEndpoint,
-      encodeURIComponent(torrentInfo.infoHash),
-      encodeURIComponent(uri),
-      encodeURIComponent(file.path),
-    ].join("/");
+    const url = getStreamUrl(streamEndpointHost, torrentInfo.infoHash, uri, file.path);
 
-    const subtitles = subs.map((sub, index) => ({
+    const subtitles = subsEnabled ? subs.map((sub, index) => ({
       id: index.toString(),
-      url: [
-        streamEndpoint,
-        encodeURIComponent(torrentInfo.infoHash),
-        encodeURIComponent(uri),
-        encodeURIComponent(sub.path),
-      ].join("/"),
+      url: getStreamUrl(streamEndpointHost, torrentInfo.infoHash, uri, sub.path),
       lang: sub.name,
-    }));
+    })) : [];
 
     return {
       stream: {
@@ -266,3 +263,20 @@ const isAllowedFormat = (config: HandlerArgs["config"], name: string) => {
 
   return true;
 };
+
+const getStreamUrl = (streamEndpointHost: string, infoHash: string, torrentUri: string, filePath: string): string => {
+  if(KEEP_DOWNLOADED_FILES && KEEP_TORRENT_FILES && isTorrentStoredLocally(filePath)) {
+    return [
+      streamEndpointHost + "/file-stream",
+      encodeURIComponent(path.join(DOWNLOAD_DIR, filePath)),
+    ].join("/");
+  }
+
+  return [
+    streamEndpointHost + "/torrent-stream",
+    encodeURIComponent(infoHash),
+    encodeURIComponent(torrentUri),
+    encodeURIComponent(filePath),
+  ].join("/");
+};
+
