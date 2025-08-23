@@ -279,6 +279,53 @@ export const seedDirectory = async () => {
   }
 };
 
+export async function deleteActiveTorrent(folderName: string, retries = 10): Promise<void> {
+  console.log(`Trying to manually delete: ${folderName}.torrent`);
+  const torrent = streamClient.torrents.find(t => t.name === folderName);
+  if (!torrent) return;
+
+  const hash = torrent.infoHash;
+
+  const count = openStreams.get(hash) || 1;
+  openStreams.set(hash, count - 1);
+
+  if (count > 1) {
+    if (retries > 0) {
+      console.log(`Streams still open for ${folderName}, retrying deletion in 5s... (${retries} retries left)`);
+      setTimeout(() => deleteActiveTorrent(folderName, retries - 1), 5000);
+    } else {
+      console.log(`Max retries reached, skipping deletion for ${folderName}`);
+    }
+    return;
+  }
+
+  openStreams.delete(hash);
+
+  let timeout = timeouts.get(hash);
+  if (timeout) {
+    clearTimeout(timeout);
+    timeouts.delete(hash);
+  }
+
+  timeout = setTimeout(async () => {
+    await handleTorrentTimeout(hash);
+
+    const torrentFilePath = path.join(TORRENT_FILE_DIR, `${folderName}.torrent`);
+    if (fs.existsSync(torrentFilePath)) {
+      try {
+        await fs.remove(torrentFilePath);
+        console.log(`Deleted torrent file: ${folderName}.torrent`);
+      } catch (error: any) {
+        console.error(`Failed to delete torrent file: ${folderName}, error: ${error.message}`);
+      }
+    }
+
+    timeouts.delete(hash);
+  }, 1000);
+
+  timeouts.set(hash, timeout);
+}
+
 //Starts the seeding process if AUTO_SEED is true
 if (AUTO_SEED) {
   seedDirectory().catch((error) => {

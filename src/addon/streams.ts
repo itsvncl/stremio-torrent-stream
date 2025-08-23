@@ -153,18 +153,29 @@ export const getStreamsFromTorrent = async (
     score: number;
   }[]
 > => {
-  const uri = torrent.torrent || torrent.magnet;
+  let uri = torrent.torrent || torrent.magnet;
   if (!uri) return [];
 
   let torrentInfo: TorrentInfo | undefined;
+
   try {
-    if (uri === torrent.torrent) {
-      torrentInfo = await getTorrentInfoFromTorrentFile(uri);
-    } else {
+    const res = await fetch(uri, { redirect: "manual" });
+
+    if (res.status === 302 || res.status === 301) {
+      const location = res.headers.get("location")!;
+      if (location.startsWith("magnet:")) {
+        uri = location;
+      }
+    }
+
+    if (uri.startsWith("magnet:")) {
       torrentInfo = await getTorrentInfoFromWebtorrent(uri);
+    } else {
+      const torrentBuffer = await res.arrayBuffer();
+      torrentInfo = await getTorrentInfoFromTorrentFile(torrentBuffer);
     }
   } catch (e: unknown) {
-    console.error("Error durring torrent info fetching: ", e);
+    console.error("Error during torrent info fetching:", e);
     return [];
   }
 

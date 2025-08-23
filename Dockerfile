@@ -42,6 +42,7 @@ ENV KEEP_TORRENT_FILES false
 ENV TORRENT_FILE_DIR /data/torrents
 ENV SEED_DIR /data/seed
 ENV ENABLE_DHT false
+ENV MANAGE_PASSWORD doit
 
 VOLUME /data
 

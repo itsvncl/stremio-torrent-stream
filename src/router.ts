@@ -11,9 +11,10 @@ import {
 } from "./torrent/webtorrent.js";
 import { isTorrentStoredLocally } from "./utils/torrent.js";
 import { getStreamingMimeType } from "./utils/file.js";
-import { DOWNLOAD_DIR, KEEP_DOWNLOADED_FILES, KEEP_TORRENT_FILES } from "./torrent/constats.js";
+import { DOWNLOAD_DIR, KEEP_DOWNLOADED_FILES, KEEP_TORRENT_FILES, MANAGE_PASSWORD } from "./torrent/constats.js";
 import fs from "fs-extra";
 import path from "path";
+import { deleteFolder, getDiskCapacity, listFolders } from "./utils/mediamanager.js";
 
 export const router = Router();
 
@@ -21,11 +22,49 @@ router.get("/stats", (_, res) => {
   res.render("stats");
 });
 
+router.get("/manage", (_, res) => {
+  res.render("manage");
+});
+
 router.get("/data/stats", (_, res) => {
   const stats = getStats();
   res.json(stats);
 });
 
+router.get("/data/diskstat", (_, res) => {
+  try {
+    const stats = getDiskCapacity();
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/data/folders", (_, res) => {
+  try {
+    const folders = listFolders();
+    res.json(folders);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete("/data/folders/:name", (req, res) => {
+  const { name } = req.params;
+  const { password } = req.body; // or req.query if you prefer query param
+
+  // 🔒 Simple password guard (replace with your real logic later)
+  if (password !== MANAGE_PASSWORD) {
+    return res.status(403).json({ error: "Invalid password." });
+  }
+
+  try {
+    deleteFolder(name);
+    res.json({ message: `Folder '${name}' deleted successfully.` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.get("/torrents/:query", async (req, res) => {
   const { query } = req.params;

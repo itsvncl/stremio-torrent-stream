@@ -6,10 +6,8 @@ import bencode from "bencode";
 import path from "path";
 
 export const getTorrentInfoFromTorrentFile = async (
-  uri: string
+  torrentBuffer: ArrayBuffer
 ): Promise<TorrentInfo | undefined> => {
-  const torrentBuffer = await fetch(uri).then((res) => res.arrayBuffer());
-
   const metadata = bencode.decode(Buffer.from(torrentBuffer));
   const textDecoder = new TextDecoder("utf-8");
 

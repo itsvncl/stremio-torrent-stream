@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    async function fetchDiskStat() {
+      try {
+        const res = await fetch("/data/diskstat");
+        const data = await res.json();
+
+        document.getElementById("diskTotal").innerText = data.totalGB + " GB";
+        document.getElementById("diskUsed").innerText = data.usedGB + " GB";
+        document.getElementById("diskFree").innerText = data.freeGB + " GB";
+        document.getElementById("diskUsage").innerText = data.usagePercent + " %";
+
+        // Update visual bar
+        const usageBar = document.getElementById("diskUsageBar");
+        usageBar.style.width = data.usagePercent + "%";
+
+        // Color based on usage
+        if (data.usagePercent < 70) {
+          usageBar.className = "h-full bg-green-500 rounded-full transition-all duration-500";
+        } else if (data.usagePercent < 90) {
+          usageBar.className = "h-full bg-yellow-500 rounded-full transition-all duration-500";
+        } else {
+          usageBar.className = "h-full bg-red-500 rounded-full transition-all duration-500";
+        }
+      } catch (err) {
+        console.error("Error fetching disk stats:", err);
+      }
+    }
+
+    async function fetchFolders() {
+      try {
+        const res = await fetch("/data/folders");
+        const folders = await res.json();
+
+        const container = document.getElementById("foldersContainer");
+        container.innerHTML = "";
+
+        if (folders.length === 0) {
+          container.innerHTML = `<p class="text-gray-400">No folders found.</p>`;
+          return;
+        }
+
+        folders.forEach(folder => {
+          const div = document.createElement("div");
+          div.classList.add("bg-gray-800", "rounded-lg", "p-4", "mb-4", "flex", "justify-between", "items-center", "shadow-lg");
+
+          div.innerHTML = `
+            <div>
+              <h3 class="text-lg font-semibold text-gray-200">${folder.name}</h3>
+              <p class="text-gray-400">Size: ${folder.sizeGB} GB</p>
+            </div>
+            <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded" onclick="deleteFolder('${folder.name}')">
+              Delete
+            </button>
+          `;
+
+          container.appendChild(div);
+        });
+      } catch (err) {
+        console.error("Error fetching folders:", err);
+      }
+    }
+
+    async function deleteFolder(name) {
+      if (!confirm(`Are you sure you want to delete folder '${name}'?`)) return;
+
+      const password = prompt("Enter password to delete folder:");
+      if (!password) return;
+
+      try {
+        const res = await fetch(`/data/folders/${encodeURIComponent(name)}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert(data.message || "Folder deleted.");
+        } else {
+          alert(data.error || "Failed to delete folder.");
+        }
+
+        fetchFolders(); // refresh list
+      } catch (err) {
+        console.error("Error deleting folder:", err);
+      }
+    }
+
+    function refreshAll() {
+      fetchDiskStat();
+      fetchFolders();
+    }
+
+    // auto refresh every 5 seconds
+    setInterval(refreshAll, 5000);
+    window.onload = refreshAll;
+  </script>
+</head>
+<body class="bg-gray-900 text-gray-300 font-sans">
+  <div class="container mx-auto p-6">
+    <!-- Header -->
+    <h1 class="text-4xl font-extrabold text-white mb-6">Media Manager</h1>
+
+    <!-- Disk Stats -->
+    <div class="bg-gray-800 rounded-lg p-6 mb-8 shadow-lg">
+      <h2 class="text-2xl font-semibold text-white mb-4">Disk Stats</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div class="flex justify-between">
+          <span class="font-medium text-gray-400">Total</span>
+          <span class="text-lg font-semibold text-gray-200" id="diskTotal">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="font-medium text-gray-400">Used</span>
+          <span class="text-lg font-semibold text-gray-200" id="diskUsed">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="font-medium text-gray-400">Free</span>
+          <span class="text-lg font-semibold text-gray-200" id="diskFree">Loading...</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="font-medium text-gray-400">Usage</span>
+          <span class="text-lg font-semibold text-gray-200" id="diskUsage">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Disk Usage Bar -->
+      <div class="w-full h-6 bg-gray-700 rounded-full overflow-hidden">
+        <div id="diskUsageBar" class="h-full bg-green-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Folders -->
+    <h2 class="text-2xl font-semibold text-white mb-4">Folders</h2>
+    <div id="foldersContainer">
+      <p class="text-gray-400">Loading folders...</p>
+    </div>
+  </div>
+</body>
+</html>

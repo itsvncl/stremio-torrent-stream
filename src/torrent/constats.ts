@@ -53,3 +53,5 @@ export const SEED_TIME = Number(process.env.SEED_TIME) || 60 * 1000;
 
 // Timeout (ms) when adding torrents if no metadata is received (default 5 seconds)
 export const TORRENT_TIMEOUT = Number(process.env.TORRENT_TIMEOUT) || 5 * 1000;
+
+export const MANAGE_PASSWORD = process.env.MANAGE_PASSWORD || "doit";
