@@ -16,6 +16,7 @@ import {
   UPLOAD_SPEED_LIMIT,
   SEED_TIME,
   TORRENT_TIMEOUT,
+  ENABLE_DHT,
 } from "./constats.js";
 
 interface FileInfo {
@@ -48,12 +49,15 @@ interface ActiveTorrentInfo extends TorrentInfo {
   files: ActiveFileInfo[];
 }
 
-const infoClient = new WebTorrent();
+const infoClient = new WebTorrent({
+  dht: ENABLE_DHT,
+});
 const streamClient = new WebTorrent({
   // @ts-ignore
   downloadLimit: DOWNLOAD_SPEED_LIMIT,
   uploadLimit: UPLOAD_SPEED_LIMIT,
   maxConns: MAX_CONNS_PER_TORRENT,
+  dht: ENABLE_DHT,
 });
 
 streamClient.on("torrent", (torrent) => {

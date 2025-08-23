@@ -15,6 +15,10 @@
         function bytesToGB(bytes) {
             return (bytes / (1024 ** 3)).toFixed(2); // Convert bytes to GB
         }
+
+        function bytesToMB(bytes) {
+            return (bytes / (1024 ** 2)).toFixed(2); // Convert bytes to MB
+        }
     
         async function fetchStats() {
             try {
@@ -31,7 +35,7 @@
             document.getElementById('uptime').innerText = data.uptime;
             document.getElementById('openStreams').innerText = data.openStreams;
             document.getElementById('downloadSpeed').innerText = `${bytesToMibps(data.downloadSpeed)} Mib/s`;
-            document.getElementById('uploadSpeed').innerText = `${bytesToMibps(data.uploadSpeed)} Mib/s`;
+            document.getElementById('uploadSpeed').innerText = `${data.uploadSpeed} bytes/s`;
     
             // Update active torrents
             const torrentsContainer = document.getElementById('torrentsContainer');
@@ -49,11 +53,11 @@
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Size:</span> ${bytesToGB(torrent.size)} GB</p>
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Progress:</span> ${Math.round(torrent.progress * 100)}%</p>
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Downloaded:</span> ${bytesToGB(torrent.downloaded)} GB</p>
-                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Uploaded:</span> ${bytesToGB(torrent.uploaded)} GB</p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Uploaded:</span> ${bytesToMB(torrent.uploaded)} MB</p>
                         </div>
                         <div>
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Download Speed:</span> <span class="text-green-400">${bytesToMibps(torrent.downloadSpeed)} Mib/s</span></p>
-                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Upload Speed:</span> <span class="text-purple-400">${bytesToMibps(torrent.uploadSpeed)} Mib/s</span></p>
+                            <p class="text-gray-400"><span class="font-semibold text-gray-300">Upload Speed:</span> <span class="text-purple-400">${torrent.uploadSpeed} bytes/s</span></p>
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Peers:</span> ${torrent.peers}</p>
                             <p class="text-gray-400"><span class="font-semibold text-gray-300">Open Streams:</span> ${torrent.openStreams}</p>
                         </div>

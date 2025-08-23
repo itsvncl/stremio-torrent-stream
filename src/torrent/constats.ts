@@ -35,6 +35,11 @@ if (!KEEP_DOWNLOADED_FILES) fs.emptyDirSync(DOWNLOAD_DIR);
 export const MAX_CONNS_PER_TORRENT =
   Number(process.env.MAX_CONNS_PER_TORRENT) || 50;
 
+// Enable dht (default false)
+export const ENABLE_DHT = process.env.ENABLE_DHT
+  ? process.env.ENABLE_DHT === "true"
+  : false;
+
 // Max download speed (bytes/s) over all torrents (default 20MB/s)
 export const DOWNLOAD_SPEED_LIMIT =
   Number(process.env.DOWNLOAD_SPEED_LIMIT) || 20 * 1024 * 1024;
