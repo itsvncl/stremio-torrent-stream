@@ -3,8 +3,20 @@ import { Manifest } from "stremio-addon-sdk";
 export const manifest: Manifest = {
   id: "community.torrent-stream-plus",
   version: "1.4.0",
-  catalogs: [],
-  resources: ["stream"],
+  catalogs: [
+    {
+      type: "series",
+      id: "jackett-search",
+      name: "Jackett Search",
+      extra: [{ name: "search", isRequired: true }],
+    }
+ ],
+  resources: [
+    "stream",
+    // @ts-ignore
+    { name: "meta", types: ["other"], idPrefixes: ["jackett"] },
+    "catalog",
+  ],
   types: ["movie", "series"],
   name: "Torrent Stream +",
   logo: "https://upload.wikimedia.org/wikipedia/en/7/79/WebTorrent_logo.png",
@@ -12,7 +24,7 @@ export const manifest: Manifest = {
     "https://i.etsystatic.com/35367581/r/il/53bf97/4463935832/il_fullxfull.4463935832_3k3g.jpg",
   description:
     "This addon enables Stremio to stream movies and shows from torrents",
-  idPrefixes: ["tt"],
+  idPrefixes: ["tt", "jackett"],
   behaviorHints: {
     // @ts-ignore
     configurable: true,

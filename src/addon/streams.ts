@@ -275,7 +275,7 @@ const isAllowedFormat = (config: HandlerArgs["config"], name: string) => {
   return true;
 };
 
-const getStreamUrl = (streamEndpointHost: string, infoHash: string, torrentUri: string, filePath: string): string => {
+export const getStreamUrl = (streamEndpointHost: string, infoHash: string, torrentUri: string, filePath: string): string => {
   if(KEEP_DOWNLOADED_FILES && KEEP_TORRENT_FILES && isTorrentStoredLocally(filePath)) {
     return [
       streamEndpointHost + "/file-stream",

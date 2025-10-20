@@ -1,6 +1,7 @@
 import { JackettApi } from "ts-jackett-api";
 import { JackettCategory } from "ts-jackett-api/lib/types/JackettCategory.js";
 import { TorrentSearchResult } from "./search.js";
+import { JackettResult } from "ts-jackett-api/lib/types/JacketResult.js";
 
 const JACKETT_URL = process.env.JACKETT_URL;
 const JACKETT_KEY = process.env.JACKETT_KEY;
@@ -11,6 +12,35 @@ export const searchJackett = async (
   jackettUrl?: string,
   jackettKey?: string
 ): Promise<TorrentSearchResult[]> => {
+  try {
+    const res = await searchJackettRaw(
+      searchQuery,
+      categories,
+      jackettUrl,
+      jackettKey
+    );
+
+    return res.map((result) => ({
+      name: result.Title,
+      tracker: result.Tracker,
+      category: result.CategoryDesc || undefined,
+      size: result.Size,
+      seeds: result.Seeders,
+      peers: result.Peers,
+      torrent: result.Link || undefined,
+      magnet: result.MagnetUri || undefined,
+    }));
+  } catch (error) {
+    return [];
+  }
+};
+
+export const searchJackettRaw = async (
+  searchQuery: string,
+  categories: JackettCategory[],
+  jackettUrl?: string,
+  jackettKey?: string
+): Promise<JackettResult[]> => {
   try {
     const url = jackettUrl || JACKETT_URL;
     const key = jackettKey || JACKETT_KEY;
@@ -24,16 +54,7 @@ export const searchJackett = async (
       category: categories,
     });
 
-    return res.Results.map((result) => ({
-      name: result.Title,
-      tracker: result.Tracker,
-      category: result.CategoryDesc || undefined,
-      size: result.Size,
-      seeds: result.Seeders,
-      peers: result.Peers,
-      torrent: result.Link || undefined,
-      magnet: result.MagnetUri || undefined,
-    }));
+    return res.Results
   } catch (error) {
     return [];
   }
