@@ -62,7 +62,9 @@ export const jackettMetaHandler = async (args: HandlerArgs) => {
     }
 
 
-    let videos = torrentInfo.files.filter((file) => isVideoFile(file.name));
+    let videos = torrentInfo.files
+        .filter((file) => isVideoFile(file.name))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
     const streamEndpointHost = args.config?.streamHost
         ? `${args.config.streamHost}`
