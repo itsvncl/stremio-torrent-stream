@@ -40,6 +40,31 @@ export const ENABLE_DHT = process.env.ENABLE_DHT
   ? process.env.ENABLE_DHT === "true"
   : false;
 
+// Enable uTP (default true)
+export const ENABLE_UTP = process.env.ENABLE_UTP
+  ? process.env.ENABLE_UTP === "true"
+  : true;
+
+// Enable NAT-PMP (default true)
+export const ENABLE_NAT_PMP = process.env.ENABLE_NAT_PMP
+  ? process.env.ENABLE_NAT_PMP === "true"
+  : true;
+
+// Enable NAT-UPnP (default true)
+export const ENABLE_NAT_UPNP = process.env.ENABLE_NAT_UPNP
+  ? process.env.ENABLE_NAT_UPNP === "true"
+  : true;
+
+// Info client port (default NULL)
+export const INFO_CLIENT_PORT = process.env.INFO_CLIENT_PORT
+  ? Number(process.env.INFO_CLIENT_PORT)
+  : null;
+
+// Stream client port (default NULL)
+export const STREAM_CLIENT_PORT = process.env.STREAM_CLIENT_PORT
+  ? Number(process.env.STREAM_CLIENT_PORT)
+  : null;
+
 // Max download speed (bytes/s) over all torrents (default 20MB/s)
 export const DOWNLOAD_SPEED_LIMIT =
   Number(process.env.DOWNLOAD_SPEED_LIMIT) || 20 * 1024 * 1024;

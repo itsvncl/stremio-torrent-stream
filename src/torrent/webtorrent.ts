@@ -17,6 +17,11 @@ import {
   SEED_TIME,
   TORRENT_TIMEOUT,
   ENABLE_DHT,
+  ENABLE_UTP,
+  ENABLE_NAT_PMP,
+  ENABLE_NAT_UPNP,
+  INFO_CLIENT_PORT,
+  STREAM_CLIENT_PORT
 } from "./constats.js";
 
 interface FileInfo {
@@ -50,7 +55,16 @@ interface ActiveTorrentInfo extends TorrentInfo {
 }
 
 const infoClient = new WebTorrent({
+  // @ts-ignore
+  downloadLimit: DOWNLOAD_SPEED_LIMIT,
+  uploadLimit: UPLOAD_SPEED_LIMIT,
+  maxConns: MAX_CONNS_PER_TORRENT,
   dht: ENABLE_DHT,
+  utp: ENABLE_UTP,
+  natUpnp: ENABLE_NAT_UPNP,
+  natPmp: ENABLE_NAT_PMP,
+  // @ts-ignore
+  torrentPort: INFO_CLIENT_PORT
 });
 const streamClient = new WebTorrent({
   // @ts-ignore
@@ -58,6 +72,11 @@ const streamClient = new WebTorrent({
   uploadLimit: UPLOAD_SPEED_LIMIT,
   maxConns: MAX_CONNS_PER_TORRENT,
   dht: ENABLE_DHT,
+  utp: ENABLE_UTP,
+  natUpnp: ENABLE_NAT_UPNP,
+  natPmp: ENABLE_NAT_PMP,
+  // @ts-ignore
+  torrentPort: STREAM_CLIENT_PORT
 });
 
 streamClient.on("torrent", (torrent) => {
