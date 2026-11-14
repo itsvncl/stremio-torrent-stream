@@ -4,7 +4,7 @@ import path from "path";
 import { createRequire } from "module";
 import WebTorrent, { Torrent } from "webtorrent";
 import { DownloadBudget } from "./download-budget.js";
-import { createPieceFileStore, getPieceStorageStats } from "./piece-file-store.js";
+import { getPieceStorageStats, pieceFileStoreFactory } from "./piece-file-store.js";
 import { getReadableDuration } from "../utils/file.js";
 import { getTorrentHash } from "../utils/torrent.js";
 import {
@@ -18,6 +18,7 @@ import {
   STORE_CACHE_SLOTS,
   DOWNLOAD_BUFFER_LIMIT,
   DISK_STORE_MODE,
+  ASSEMBLY_BATCH_BYTES,
   DOWNLOAD_SPEED_LIMIT,
   UPLOAD_SPEED_LIMIT,
   SEED_TIME,
@@ -29,6 +30,8 @@ import {
   INFO_CLIENT_PORT,
   STREAM_CLIENT_PORT
 } from "./constats.js";
+
+const pieceFileStore = pieceFileStoreFactory(ASSEMBLY_BATCH_BYTES);
 
 interface FileInfo {
   name: string;
@@ -147,7 +150,7 @@ export const getOrAddTorrent = (uri: string, infoHash: string = "") =>
       path: DOWNLOAD_DIR,
       destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
       storeCacheSlots: STORE_CACHE_SLOTS,
-      ...(DISK_STORE_MODE === "piece-files" ? { store: createPieceFileStore } : {}),
+      ...(DISK_STORE_MODE === "piece-files" ? { store: pieceFileStore } : {}),
     };
 
     if (!KEEP_DOWNLOADED_FILES) {
@@ -321,7 +324,7 @@ export const seedDirectory = async () => {
 
     console.log(`Initializing torrent for seeding: ${file}`);
     streamClient.add(filePath, { path: DOWNLOAD_DIR, storeCacheSlots: STORE_CACHE_SLOTS,
-      ...(DISK_STORE_MODE === "piece-files" ? { store: createPieceFileStore } : {}),
+      ...(DISK_STORE_MODE === "piece-files" ? { store: pieceFileStore } : {}),
     }, (torrent) => {
       console.log(`Seeding torrent: ${file}`);
       scheduleTorrentTimeout(torrent.infoHash);

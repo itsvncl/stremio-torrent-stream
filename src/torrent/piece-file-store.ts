@@ -60,6 +60,14 @@ export function createPieceFileStore(chunkLength: number, options: unknown) {
   return new PieceFileStore(chunkLength, options);
 }
 
+export function pieceFileStoreFactory(assemblyBatchBytes: number) {
+  // A function expression (not an arrow) because WebTorrent invokes stores with `new`.
+  return function pieceFileStore(chunkLength: number, options: unknown) {
+    if (typeof options !== "object" || options === null) throw new Error("Invalid piece-file storage options");
+    return createPieceFileStore(chunkLength, { ...options, assemblyBatchBytes });
+  };
+}
+
 const isStoreOptions = (value: unknown): value is StoreOptions => {
   if (typeof value !== "object" || value === null ||
     !("torrent" in value) || !isStoreTorrent(value.torrent)) return false;

@@ -186,6 +186,16 @@ test("download buffer configuration rejects unsafe or disabling values before st
   }
 });
 
+test("assembly batch configuration rejects unsafe values before startup", () => {
+  for (const value of ["-1", "0", "1.5", "invalid", "", "Infinity", "9007199254740992"]) {
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", configScript], {
+      env: { ...process.env, ASSEMBLY_BATCH_BYTES: value }, encoding: "utf8",
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ASSEMBLY_BATCH_BYTES must be a positive safe integer/);
+  }
+});
+
 test("missing engine patch fails at startup rather than silently leaving downloads unbounded", () => {
   const script = `
     import { mock } from "node:test";

@@ -46,6 +46,13 @@ if (downloadBufferLimit.trim() === "" || !Number.isSafeInteger(DOWNLOAD_BUFFER_L
   throw new Error("DOWNLOAD_BUFFER_LIMIT must be a positive safe integer");
 }
 
+// Bytes copied into final files before each forced disk sync during piece assembly (default 64 MiB)
+const assemblyBatchBytes = process.env.ASSEMBLY_BATCH_BYTES ?? "67108864";
+export const ASSEMBLY_BATCH_BYTES = Number(assemblyBatchBytes);
+if (assemblyBatchBytes.trim() === "" || !Number.isSafeInteger(ASSEMBLY_BATCH_BYTES) || ASSEMBLY_BATCH_BYTES <= 0) {
+  throw new Error("ASSEMBLY_BATCH_BYTES must be a positive safe integer");
+}
+
 const diskStoreMode = process.env.DISK_STORE_MODE ?? "auto";
 if (!["auto", "direct", "piece-files"].includes(diskStoreMode)) {
   throw new Error("DISK_STORE_MODE must be auto, direct or piece-files");

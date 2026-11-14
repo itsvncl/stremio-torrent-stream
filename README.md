@@ -135,8 +135,14 @@ The piece-file backend stores out-of-order chunks in small private
 chunks without extending the movie to a distant offset. Once downloading
 finishes, one materialization job at a time writes the normal movie files in
 ascending order and reclaims each chunk after saving progress. Materialization
-flushes and records progress once per 64 MiB batch instead of once per piece,
-which avoids paying slow USB/exFAT sync latency thousands of times. Spool writes and
+flushes and records progress once per `ASSEMBLY_BATCH_BYTES` batch (default
+`67108864`, 64 MiB) instead of once per piece, which avoids paying slow USB/exFAT
+sync latency thousands of times. Larger values mean fewer syncs but more unsynced
+data in the kernel's (reclaimable) filesystem cache and more work redone after an
+interrupted batch; Node memory does not grow because pieces are copied one at a
+time. A batch always includes at least one piece. The value must be a positive
+safe integer (bytes). Assembly still copies the whole movie once on the same
+drive, so it is bounded by disk speed. Spool writes and
 movie-copy writes are flushed to disk before completion, so callbacks do not
 simply move a large backlog into dirty filesystem cache. Network intake follows
 real storage throughput; there is no new configured network-speed cap.

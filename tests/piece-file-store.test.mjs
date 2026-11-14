@@ -7,7 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import WebTorrent from "webtorrent";
 import MemoryStore from "memory-chunk-store";
-import { PieceFileStore, createPieceFileStore } from "../dist/torrent/piece-file-store.js";
+import { PieceFileStore, createPieceFileStore, pieceFileStoreFactory } from "../dist/torrent/piece-file-store.js";
 import { DownloadBudget } from "../dist/torrent/download-budget.js";
 
 const hash = (data) => createHash("sha1").update(data).digest("hex");
@@ -145,6 +145,33 @@ test("interrupted materialization retains pieces and repairs a previously materi
   torrent.emit("done");
   await waitFor(() => store.getStats().status === "ready");
   assert.deepEqual(await fs.readFile(path.join(directory, "a")), Buffer.concat(chunks));
+});
+
+test("configured assembly batch size controls how many durability flushes are paid", async (t) => {
+  for (const [batchBytes, expectedSyncs] of [[4, 3], [8, 2], [1024, 1]]) {
+    const directory = await temporary(t);
+    const chunks = [Buffer.from("abcd"), Buffer.from("efgh"), Buffer.from("ij")];
+    const torrent = makeTorrent(chunks);
+    const Store = pieceFileStoreFactory(batchBytes);
+    const store = new Store(4, { path: directory, torrent, files: [{ path: "a", length: 10 }] });
+    for (let index = 0; index < chunks.length; index++) await put(store, index, chunks[index]);
+    const original = fs.open;
+    let syncs = 0;
+    t.mock.method(fs, "open", async (...args) => {
+      const handle = await original(...args);
+      if (args[1] === "r+") {
+        const sync = handle.sync.bind(handle);
+        handle.sync = () => { syncs++; return sync(); };
+      }
+      return handle;
+    });
+    torrent.emit("done");
+    await waitFor(() => store.getStats().status === "ready");
+    t.mock.restoreAll();
+    await close(store);
+    assert.equal(syncs, expectedSyncs, `batch ${batchBytes}`);
+    assert.deepEqual(await fs.readFile(path.join(directory, "a")), Buffer.concat(chunks));
+  }
 });
 
 test("assembly errors remain visible and preserve recoverable chunks and incomplete markers", async (t) => {
