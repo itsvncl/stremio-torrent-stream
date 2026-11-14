@@ -156,7 +156,7 @@ router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) =
       streamClosed(torrent.infoHash, file.name);
     });
 
-    pipeTorrentStream(videoStream, res);
+    pipeTorrentStream(videoStream, res, end - start + 1);
   } catch (error) {
     console.error(`Failed to stream ${file.name}: ${error.message}`);
     res.destroy(error);

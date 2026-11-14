@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import MemoryStore from "memory-chunk-store";
 import path from "path";
+import { createRequire } from "module";
 import WebTorrent, { Torrent } from "webtorrent";
 import { getReadableDuration } from "../utils/file.js";
 import { getTorrentHash } from "../utils/torrent.js";
@@ -81,6 +82,9 @@ const streamClient = new WebTorrent({
   torrentPort: STREAM_CLIENT_PORT
 });
 
+const { version: webtorrentVersion }: { version: string } =
+  createRequire(import.meta.url)("webtorrent/package.json");
+
 streamClient.on("torrent", (torrent) => {
   console.log(`Added torrent: ${torrent.name}`);
 });
@@ -101,6 +105,8 @@ const launchTime = Date.now();
 export const getStats = () => ({
   uptime: getReadableDuration(Date.now() - launchTime),
   memory: process.memoryUsage(),
+  storeCacheSlots: STORE_CACHE_SLOTS,
+  webtorrentVersion,
   openStreams: [...openStreams.values()].reduce((a, b) => a + b, 0),
   downloadSpeed: streamClient.downloadSpeed,
   uploadSpeed: streamClient.uploadSpeed,

@@ -3,7 +3,8 @@ import { pipeline, Transform } from "stream";
 
 export const pipeTorrentStream = (
   source: NodeJS.ReadableStream,
-  response: ServerResponse
+  response: ServerResponse,
+  expectedBytes: number
 ) => {
   const firstDataTimeout = setTimeout(() => {
     monitor.destroy(new Error("Torrent stream received no data for 10 seconds"));
@@ -12,11 +13,22 @@ export const pipeTorrentStream = (
     monitor.destroy(new Error("Torrent stream stalled for 60 seconds"));
   }, 60000);
 
+  let bytesRead = 0;
   const monitor = new Transform({
     transform(chunk, _encoding, callback) {
+      bytesRead += chunk.byteLength;
+      if (bytesRead > expectedBytes) {
+        return callback(new Error(`Torrent stream exceeded the requested ${expectedBytes} bytes`));
+      }
       clearTimeout(firstDataTimeout);
       idleTimeout.refresh();
       callback(null, chunk);
+    },
+    flush(callback) {
+      if (bytesRead !== expectedBytes) {
+        return callback(new Error(`Torrent stream ended early: ${bytesRead} of ${expectedBytes} bytes`));
+      }
+      callback();
     },
   });
 
