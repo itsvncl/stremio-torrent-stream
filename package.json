@@ -48,7 +48,8 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "stremio-addon-sdk@1.6.10": "patches/stremio-addon-sdk@1.6.10.patch"
+      "stremio-addon-sdk@1.6.10": "patches/stremio-addon-sdk@1.6.10.patch",
+      "webtorrent@3.0.21": "patches/webtorrent@3.0.21.patch"
     }
   }
 }

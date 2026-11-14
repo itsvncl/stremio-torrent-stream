@@ -46,6 +46,15 @@
             }
             document.getElementById('storeCacheSlots').innerText = `${data.storeCacheSlots} pieces per torrent`;
             document.getElementById('webtorrentVersion').innerText = data.webtorrentVersion || 'Backend update required';
+            const budget = data.downloadBudget;
+            for (const key of ['reservedBytes', 'effectiveLimitBytes', 'partialBytes', 'hashingBytes', 'pendingWriteBytes']) {
+                document.getElementById(`budget-${key}`).innerText = budget ? `${bytesToMB(budget[key])} MiB` : 'Backend update required';
+            }
+            document.getElementById('budgetStatus').innerText = !budget
+                ? 'Download backpressure unavailable: deploy the updated backend.'
+                : budget.waitingTorrents > 0
+                    ? `Backpressure active: ${budget.waitingTorrents} torrent(s) waiting for active pieces / disk writes.`
+                    : `Within budget: ${budget.activePieces} active piece(s).`;
     
             // Update active torrents
             const torrentsContainer = document.getElementById('torrentsContainer');
@@ -193,6 +202,21 @@
         </div>
 
         <!-- Torrents -->
+        <h2 class="text-2xl font-semibold text-white mb-4">Download Backpressure</h2>
+        <div class="bg-gray-800 rounded-lg p-6 mb-8 shadow-lg">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div><p class="text-gray-400">Reserved Download Capacity</p><p id="budget-reservedBytes">Loading...</p></div>
+                <div><p class="text-gray-400">Effective Download Budget</p><p id="budget-effectiveLimitBytes">Loading...</p></div>
+                <div><p class="text-gray-400">Received Partial-Piece Data</p><p id="budget-partialBytes">Loading...</p></div>
+                <div><p class="text-gray-400">Pieces Being Hashed</p><p id="budget-hashingBytes">Loading...</p></div>
+                <div><p class="text-gray-400">Pieces Awaiting Disk Callbacks</p><p id="budget-pendingWriteBytes">Loading...</p></div>
+            </div>
+            <p id="budgetStatus" role="status" class="mt-4">Loading...</p>
+            <p class="text-sm text-gray-400 mt-4">Capacity is reserved before requesting pieces and includes assembly-copy headroom.
+                These are download-pipeline counters, not measured RAM. Cache, HTTP, peer and filesystem buffers are separate.
+                One piece larger than the configured budget is admitted alone to avoid deadlock.</p>
+        </div>
+
         <h2 class="text-2xl font-semibold text-white mb-4">Active Torrents</h2>
         <div id="torrentsContainer">
             <p class="text-gray-400">Loading torrents...</p>

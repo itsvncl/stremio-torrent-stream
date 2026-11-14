@@ -1,0 +1,249 @@
+diff --git a/index.js b/index.js
+index 8d3d1561eadcab7d8dc8ddffc71cf8342660bff9..4f3c56eb7b1e8f0ed7dfe70ccfc49bb551968565 100644
+--- a/index.js
++++ b/index.js
+@@ -49,6 +49,9 @@ export default class WebTorrent extends EventEmitter {
+   constructor (opts = {}) {
+     super()
+ 
++    this._pieceBudget = opts.pieceBudget
++    this._pieceBudget?.attach()
++
+     if (typeof opts.peerId === 'string') {
+       this.peerId = opts.peerId
+     } else if (ArrayBuffer.isView(opts.peerId)) {
+diff --git a/lib/torrent.js b/lib/torrent.js
+index 771a87fa5004f5ff82e9b5c3d9d8b0d70e110dbf..c37134eed66b94a0cbb7084257b8e8ce5aed7e19 100644
+--- a/lib/torrent.js
++++ b/lib/torrent.js
+@@ -956,6 +956,8 @@ export default class Torrent extends EventEmitter {
+     this.destroyed = true
+     this._debug('destroy')
+ 
++    this.client._pieceBudget?.cancelTorrent(this)
++
+     this.client._remove(this)
+ 
+     this._selections.clear()
+@@ -1628,6 +1630,16 @@ export default class Torrent extends EventEmitter {
+       return
+     }
+ 
++    // Finish admitted pieces before opening more partial pieces.
++    if (self.client._pieceBudget) {
++      for (const index of self.client._pieceBudget.partialIndexes(self)) {
++        if (!self._isPieceSelected(index) || !wire.peerPieces.get(index)) continue
++        while (self._request(wire, index, self._critical[index]) &&
++          wire.requests.length < maxOutstandingRequests) {}
++        if (wire.requests.length >= maxOutstandingRequests) return
++      }
++    }
++
+     if (!wire.downloaded) return validateWire()
+ 
+     trySelectWire(false) || trySelectWire(true)
+@@ -1920,8 +1932,30 @@ export default class Torrent extends EventEmitter {
+   /**
+    * Attempts to request a block from the given wire.
+    */
++  _hasPieceRequests (index) {
++    return this._reservations[index]?.some(wire => wire !== null) || false
++  }
++
++  _isPieceSelected (index) {
++    for (let i = 0; i < this._selections.length; i++) {
++      const selection = this._selections.get(i)
++      if (index >= selection.from + selection.offset && index <= selection.to) return true
++    }
++    return false
++  }
++
++  _discardPartial (index, piece) {
++    if (this.pieces[index] === piece) {
++      this.pieces[index] = new Piece(piece.length)
++      this._reservations[index] = null
++    }
++    piece._buffer = null
++    piece.sources = null
++  }
++
+   _request (wire, index, hotswap) {
+     const self = this
++    const budget = self.client._pieceBudget
+     const numRequests = wire.requests.length
+     const isWebSeed = wire.type === 'webSeed'
+ 
+@@ -1938,6 +1972,8 @@ export default class Torrent extends EventEmitter {
+     // var endGame = (wire.requests.length === 0 && self.store.numMissing < 30)
+ 
+     const piece = self.pieces[index]
++    if (!piece || piece._flushed) return false
++    if (budget && !budget.reserve(self, index, piece)) return false
+     let reservation = isWebSeed ? piece.reserveRemaining() : piece.reserve()
+ 
+     if (reservation === -1 && hotswap && self._hotswap(wire, index)) {
+@@ -1971,6 +2007,10 @@ export default class Torrent extends EventEmitter {
+           err.message
+         )
+         isWebSeed ? piece.cancelRemaining(reservation) : piece.cancel(reservation)
++        if (budget && piece.missing === piece.length && !self._hasPieceRequests(index)) {
++          self._discardPartial(index, piece)
++          budget.release(piece)
++        }
+         onUpdateTick()
+         return
+       }
+@@ -1980,19 +2020,35 @@ export default class Torrent extends EventEmitter {
+         index, chunkOffset, chunkLength, `${wire.remoteAddress}:${wire.remotePort}`
+       )
+ 
+-      if (!piece.set(reservation, chunk, wire)) return onUpdateTick()
++      const complete = piece.set(reservation, chunk, wire)
++      budget?.progress(piece)
++      if (!complete) return onUpdateTick()
+ 
++      budget?.setPhase(piece, 'hashing')
+       const buf = piece.flush()
+ 
+       // TODO: might need to set self.pieces[index] = null here since sha1 is async
+ 
+-      const hex = await hash(buf, 'hex')
+-      if (self.destroyed) return
++      let hex
++      try {
++        hex = await hash(buf, 'hex')
++      } catch (err) {
++        budget?.release(piece)
++        if (!self.destroyed) self._destroy(err)
++        return
++      }
++      if (self.destroyed) {
++        budget?.release(piece)
++        return
++      }
+ 
+       if (hex === self._hashes[index]) {
+         self._debug('piece verified %s', index)
+ 
++        budget?.setPhase(piece, 'writing')
+         self.store.put(index, buf, err => {
++          budget?.release(piece)
++          if (self.destroyed) return
+           if (err) {
+             self._destroy(err)
+             return
+@@ -2008,6 +2064,7 @@ export default class Torrent extends EventEmitter {
+         })
+       } else {
+         self.pieces[index] = new Piece(piece.length)
++        budget?.release(piece)
+         self.emit('warning', new Error(`Piece ${index} failed verification`))
+         onUpdateTick()
+       }
+diff --git a/lib/webconn.js b/lib/webconn.js
+index 10d65fbaff623441b40fda541b9ba9d9b7432060..3500c8e73880952085e61ca848cd20710ca4f6b2 100644
+--- a/lib/webconn.js
++++ b/lib/webconn.js
+@@ -25,6 +25,7 @@ export default class WebConn extends Wire {
+     this.url = url
+     this.connId = url // Unique id to deduplicate web seeds
+     this._torrent = torrent
++    this._httpRequests = new Set()
+ 
+     this._init(url)
+   }
+@@ -103,7 +104,6 @@ export default class WebConn extends Wire {
+       }
+ 
+       requests = requestedFiles.map(requestedFile => {
+-        const fileEnd = requestedFile.offset + requestedFile.length - 1
+         const url = this.url +
+           (this.url[this.url.length - 1] === '/' ? '' : '/') +
+           requestedFile.path.replace(this._torrent.path, '')
+@@ -111,42 +111,62 @@ export default class WebConn extends Wire {
+           url,
+           fileOffsetInRange: Math.max(requestedFile.offset - rangeStart, 0),
+           start: Math.max(rangeStart - requestedFile.offset, 0),
+-          end: Math.min(fileEnd, rangeEnd - requestedFile.offset)
++          end: Math.min(requestedFile.length - 1, rangeEnd - requestedFile.offset)
+         }
+       })
+     }
++    const controller = new AbortController()
++    this._httpRequests.add(controller)
++    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(SOCKET_TIMEOUT)])
++    const pending = requests.map(async ({ start, end, url }) => {
++      const res = await fetch(url, {
++        cache: 'no-store',
++        method: 'GET',
++        headers: {
++          'Cache-Control': 'no-store',
++          'user-agent': `WebTorrent/${VERSION} (https://webtorrent.io)`,
++          'accept-encoding': 'identity',
++          range: `bytes=${start}-${end}`
++        },
++        signal
++      })
++      if (res.status !== 206 && !(res.status === 200 && start === 0)) {
++        throw new Error(`Web seed did not honor byte range: HTTP ${res.status}`)
++      }
++      const expected = end - start + 1
++      const contentLength = res.headers.get('content-length')
++      if (contentLength !== null && Number(contentLength) > expected) {
++        throw new Error(`Web seed response exceeds requested ${expected} bytes`)
++      }
++      if (!res.body) throw new Error('Web seed returned no response body')
++      const data = new Uint8Array(expected)
++      let received = 0
++      for await (const block of res.body) {
++        if (received + block.length > expected) {
++          throw new Error(`Web seed response exceeds requested ${expected} bytes`)
++        }
++        data.set(block, received)
++        received += block.length
++      }
++      if (received !== expected) throw new Error(`Web seed ended early: ${received} of ${expected} bytes`)
++      return data
++    })
+     let chunks
+     try {
+-      chunks = await Promise.all(requests.map(async ({ start, end, url }) => {
+-        debug(
+-          'Requesting url=%s pieceIndex=%d offset=%d length=%d start=%d end=%d',
+-          url, pieceIndex, offset, length, start, end
+-        )
+-        const res = await fetch(url, {
+-          cache: 'no-store',
+-          method: 'GET',
+-          headers: {
+-            'Cache-Control': 'no-store',
+-            'user-agent': `WebTorrent/${VERSION} (https://webtorrent.io)`,
+-            range: `bytes=${start}-${end}`
+-          },
+-          signal: AbortSignal.timeout(SOCKET_TIMEOUT)
+-        })
+-        if (!res.ok) throw new Error(`Unexpected HTTP status code ${res.status}`)
+-        const data = new Uint8Array(await res.arrayBuffer())
+-
+-        debug('Got data of length %d', data.length)
+-
+-        return data
+-      }))
++      chunks = await Promise.all(pending)
+     } catch (e) {
++      controller.abort()
++      await Promise.allSettled(pending)
+       return cb(e)
++    } finally {
++      this._httpRequests.delete(controller)
+     }
+ 
+-    cb(null, concat(chunks))
++    cb(null, chunks.length === 1 ? chunks[0] : concat(chunks))
+   }
+ 
+   destroy () {
++    for (const controller of this._httpRequests) controller.abort()
+     super.destroy()
+     this._torrent = null
+   }

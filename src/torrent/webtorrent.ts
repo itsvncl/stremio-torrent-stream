@@ -3,6 +3,7 @@ import MemoryStore from "memory-chunk-store";
 import path from "path";
 import { createRequire } from "module";
 import WebTorrent, { Torrent } from "webtorrent";
+import { DownloadBudget } from "./download-budget.js";
 import { getReadableDuration } from "../utils/file.js";
 import { getTorrentHash } from "../utils/torrent.js";
 import {
@@ -14,6 +15,7 @@ import {
   KEEP_TORRENT_FILES,
   MAX_CONNS_PER_TORRENT,
   STORE_CACHE_SLOTS,
+  DOWNLOAD_BUFFER_LIMIT,
   DOWNLOAD_SPEED_LIMIT,
   UPLOAD_SPEED_LIMIT,
   SEED_TIME,
@@ -57,8 +59,8 @@ interface ActiveTorrentInfo extends TorrentInfo {
   files: ActiveFileInfo[];
 }
 
-const infoClient = new WebTorrent({
-  // @ts-ignore
+const downloadBudget = new DownloadBudget(DOWNLOAD_BUFFER_LIMIT);
+const clientOptions = {
   downloadLimit: DOWNLOAD_SPEED_LIMIT,
   uploadLimit: UPLOAD_SPEED_LIMIT,
   maxConns: MAX_CONNS_PER_TORRENT,
@@ -66,21 +68,15 @@ const infoClient = new WebTorrent({
   utp: ENABLE_UTP,
   natUpnp: ENABLE_NAT_UPNP,
   natPmp: ENABLE_NAT_PMP,
-  // @ts-ignore
-  torrentPort: INFO_CLIENT_PORT
-});
-const streamClient = new WebTorrent({
-  // @ts-ignore
-  downloadLimit: DOWNLOAD_SPEED_LIMIT,
-  uploadLimit: UPLOAD_SPEED_LIMIT,
-  maxConns: MAX_CONNS_PER_TORRENT,
-  dht: ENABLE_DHT,
-  utp: ENABLE_UTP,
-  natUpnp: ENABLE_NAT_UPNP,
-  natPmp: ENABLE_NAT_PMP,
-  // @ts-ignore
-  torrentPort: STREAM_CLIENT_PORT
-});
+  pieceBudget: downloadBudget,
+};
+const infoOptions = { ...clientOptions, torrentPort: INFO_CLIENT_PORT };
+const streamOptions = { ...clientOptions, torrentPort: STREAM_CLIENT_PORT };
+const infoClient = new WebTorrent(infoOptions);
+const streamClient = new WebTorrent(streamOptions);
+if (downloadBudget.attachedClients !== 2) {
+  throw new Error("WebTorrent download-memory patch is missing. Reinstall dependencies using the committed pnpm lockfile.");
+}
 
 const { version: webtorrentVersion }: { version: string } =
   createRequire(import.meta.url)("webtorrent/package.json");
@@ -107,6 +103,7 @@ export const getStats = () => ({
   memory: process.memoryUsage(),
   storeCacheSlots: STORE_CACHE_SLOTS,
   webtorrentVersion,
+  downloadBudget: downloadBudget.getStats(),
   openStreams: [...openStreams.values()].reduce((a, b) => a + b, 0),
   downloadSpeed: streamClient.downloadSpeed,
   uploadSpeed: streamClient.uploadSpeed,

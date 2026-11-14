@@ -40,6 +40,12 @@ if (
   throw new Error("STORE_CACHE_SLOTS must be a non-negative safe integer");
 }
 
+const downloadBufferLimit = process.env.DOWNLOAD_BUFFER_LIMIT ?? "134217728";
+export const DOWNLOAD_BUFFER_LIMIT = Number(downloadBufferLimit);
+if (downloadBufferLimit.trim() === "" || !Number.isSafeInteger(DOWNLOAD_BUFFER_LIMIT) || DOWNLOAD_BUFFER_LIMIT <= 0) {
+  throw new Error("DOWNLOAD_BUFFER_LIMIT must be a positive safe integer");
+}
+
 if (!KEEP_DOWNLOADED_FILES) fs.emptyDirSync(DOWNLOAD_DIR);
 
 // Maximum number of connections per torrent (default 50)

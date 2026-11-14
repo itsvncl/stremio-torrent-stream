@@ -8,6 +8,9 @@ patchedDependencies:
   stremio-addon-sdk@1.6.10:
     hash: xstlfg2vnbadlx4smrydfd2t4e
     path: patches/stremio-addon-sdk@1.6.10.patch
+  webtorrent@3.0.21:
+    hash: xzlhmflb4tsrnadateufku4rjy
+    path: patches/webtorrent@3.0.21.patch
 
 importers:
 
@@ -66,7 +69,7 @@ importers:
         version: 1.0.0
       webtorrent:
         specifier: 3.0.21
-        version: 3.0.21
+        version: 3.0.21(patch_hash=xzlhmflb4tsrnadateufku4rjy)
       yts-api-node:
         specifier: ^1.1.3
         version: 1.1.3
@@ -4574,7 +4577,7 @@ snapshots:
     dependencies:
       node-datachannel: 0.32.3
 
-  webtorrent@3.0.21:
+  webtorrent@3.0.21(patch_hash=xzlhmflb4tsrnadateufku4rjy):
     dependencies:
       '@silentbot1/nat-api': 0.4.9
       '@thaunknown/simple-peer': 10.1.2
