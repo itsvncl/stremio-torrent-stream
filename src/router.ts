@@ -11,6 +11,7 @@ import {
 } from "./torrent/webtorrent.js";
 import { isTorrentStoredLocally } from "./utils/torrent.js";
 import { getStreamingMimeType } from "./utils/file.js";
+import { pipeTorrentStream } from "./utils/stream.js";
 import { DOWNLOAD_DIR, KEEP_DOWNLOADED_FILES, KEEP_TORRENT_FILES, MANAGE_PASSWORD } from "./torrent/constats.js";
 import fs from "fs-extra";
 import path from "path";
@@ -118,7 +119,10 @@ router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) =
   ? torrentUri
   : await saveOrGetTorrentFile(torrentUri, filePath);
 
+  if (res.destroyed) return;
+
   const torrent = await getOrAddTorrent(uri, infoHash);
+  if (res.destroyed) return;
   if (!torrent) return res.status(500).send("Failed to add torrent");
 
   const file = getFile(torrent, filePath);
@@ -146,35 +150,16 @@ router.get("/torrent-stream/:infoHash/:torrentUri/:filePath", async (req, res) =
   res.writeHead(206, headers);
 
   try {
-    const noDataTimeout = setTimeout(() => {
-      res.status(500).end();
-    }, 10000);
-
-    const noReadTimeout = setTimeout(() => {
-      res.status(200).end();
-    }, 60000);
-
     const videoStream = file.createReadStream({ start, end });
-
-    videoStream.on("data", () => {
-      clearTimeout(noDataTimeout);
-    });
-
-    videoStream.on("readable", () => {
-      noReadTimeout.refresh();
-    });
-
-    videoStream.on("error", (error) => {});
-
-    videoStream.pipe(res);
-
     streamOpened(torrent.infoHash, file.name);
-
-    res.on("close", () => {
+    res.once("close", () => {
       streamClosed(torrent.infoHash, file.name);
     });
+
+    pipeTorrentStream(videoStream, res);
   } catch (error) {
-    res.status(500).end();
+    console.error(`Failed to stream ${file.name}: ${error.message}`);
+    res.destroy(error);
   }
 });
 

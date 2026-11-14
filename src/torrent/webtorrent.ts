@@ -12,6 +12,7 @@ import {
   KEEP_DOWNLOADED_FILES,
   KEEP_TORRENT_FILES,
   MAX_CONNS_PER_TORRENT,
+  STORE_CACHE_SLOTS,
   DOWNLOAD_SPEED_LIMIT,
   UPLOAD_SPEED_LIMIT,
   SEED_TIME,
@@ -44,6 +45,7 @@ export interface TorrentInfo {
 }
 
 interface ActiveTorrentInfo extends TorrentInfo {
+  pieceLength: number;
   progress: number;
   downloaded: number;
   uploaded: number;
@@ -98,6 +100,7 @@ const launchTime = Date.now();
 
 export const getStats = () => ({
   uptime: getReadableDuration(Date.now() - launchTime),
+  memory: process.memoryUsage(),
   openStreams: [...openStreams.values()].reduce((a, b) => a + b, 0),
   downloadSpeed: streamClient.downloadSpeed,
   uploadSpeed: streamClient.uploadSpeed,
@@ -105,6 +108,7 @@ export const getStats = () => ({
     name: torrent.name,
     infoHash: torrent.infoHash,
     size: torrent.length,
+    pieceLength: torrent.pieceLength,
     progress: torrent.progress,
     downloaded: torrent.downloaded,
     uploaded: torrent.uploaded,
@@ -134,6 +138,7 @@ export const getOrAddTorrent = (uri: string, infoHash: string = "") =>
     const options = {
       path: DOWNLOAD_DIR,
       destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
+      storeCacheSlots: STORE_CACHE_SLOTS,
     };
 
     if (!KEEP_DOWNLOADED_FILES) {
@@ -143,6 +148,7 @@ export const getOrAddTorrent = (uri: string, infoHash: string = "") =>
     console.log(`Torrent doesn't exists: ${infoHash}, adding ${uri}`);
     const torrent = streamClient.add(uri, options, (torrent) => {
       clearTimeout(timeout);
+      scheduleTorrentTimeout(torrent.infoHash);
       resolve(torrent);
     });
 
@@ -169,9 +175,15 @@ export const getTorrentInfoFromWebtorrent = async (uri: string) => {
   });
 
   return await new Promise<TorrentInfo | undefined>((resolve) => {
+    const options = {
+      store: MemoryStore,
+      destroyStoreOnDestroy: true,
+      deselect: true,
+      storeCacheSlots: 0,
+    };
     const torrent = infoClient.add(
       uri,
-      { store: MemoryStore, destroyStoreOnDestroy: true },
+      options,
       (torrent) => {
         clearTimeout(timeout);
         const info = getInfo(torrent);
@@ -208,29 +220,35 @@ export const streamOpened = (hash: string, fileName: string) => {
 export const streamClosed = (hash: string, fileName: string) => {
   console.log(`Stream closed: ${fileName}`);
 
-  const count = openStreams.get(hash) || 1;
-  openStreams.set(hash, count - 1);
+  const count = openStreams.get(hash);
+  if (!count) return;
 
-  if (count > 1) return;
+  if (count > 1) {
+    openStreams.set(hash, count - 1);
+    return;
+  }
 
   openStreams.delete(hash);
+  scheduleTorrentTimeout(hash);
+};
 
-  let timeout = timeouts.get(hash);
-  if (timeout) return;
-
-  timeout = setTimeout(() => handleTorrentTimeout(hash), SEED_TIME);
-
-  timeouts.set(hash, timeout);
+const scheduleTorrentTimeout = (hash: string) => {
+  if (openStreams.has(hash) || timeouts.has(hash)) return;
+  timeouts.set(hash, setTimeout(() => handleTorrentTimeout(hash), SEED_TIME));
 };
 
 const handleTorrentTimeout = async (hash: string) => {
+  timeouts.delete(hash);
   const torrent = await streamClient.get(hash);
+  if (!torrent || openStreams.has(hash)) return;
 
-  // @ts-ignore
-  torrent?.destroy(undefined, async () => {
+  torrent.destroy(undefined, async (error) => {
+    if (error) {
+      console.error(`Failed to remove torrent ${torrent.name}: ${error}`);
+      return;
+    }
     console.log(`Removed torrent: ${torrent.name}`);
 
-    timeouts.delete(torrent.infoHash);
     const seedPath = path.join(SEED_DIR, `${torrent.name}.torrent`);
 
     try {
@@ -280,21 +298,18 @@ export const seedDirectory = async () => {
 
   for (const file of files) {
     const filePath = path.join(SEED_DIR, file);
+    if (path.extname(filePath) !== ".torrent") continue;
+
     const fileBuffer = await fs.readFile(filePath);
-    const hash = await getTorrentHash(fileBuffer.buffer);
+    const hash = await getTorrentHash(fileBuffer);
 
-    let timeout = timeouts.get(hash);
-    if (timeout) return;
+    if (await streamClient.get(hash)) continue;
 
-    if (path.extname(filePath) === ".torrent") {
-      console.log(`Initializing torrent for seeding: ${file}`)
-      streamClient.add(filePath, { path: DOWNLOAD_DIR }, (_) => {
-        console.log(`Seeding torrent: ${file}`);
-        timeout = setTimeout(() => handleTorrentTimeout(hash), SEED_TIME);
-      });
-    }
-
-    timeouts.set(hash, timeout);
+    console.log(`Initializing torrent for seeding: ${file}`);
+    streamClient.add(filePath, { path: DOWNLOAD_DIR, storeCacheSlots: STORE_CACHE_SLOTS }, (torrent) => {
+      console.log(`Seeding torrent: ${file}`);
+      scheduleTorrentTimeout(torrent.infoHash);
+    });
   }
 };
 

@@ -40,7 +40,7 @@ export const getTorrentInfoFromTorrentFile = async (
 };
 
 export const getTorrentHash = async (
-  torrentBuffer: ArrayBufferLike
+  torrentBuffer: ArrayBufferLike | Uint8Array
 ): Promise<string | undefined> => {
   const metadata = bencode.decode(torrentBuffer);
   const infoHash = createHash("sha1")

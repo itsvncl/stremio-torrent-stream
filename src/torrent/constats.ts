@@ -29,6 +29,17 @@ export const KEEP_TORRENT_FILES = process.env.KEEP_TORRENT_FILES
   ? process.env.KEEP_TORRENT_FILES === "true"
   : false;
 
+// Maximum cached pieces per torrent (default 5; 0 disables caching)
+const storeCacheSlots = process.env.STORE_CACHE_SLOTS ?? "5";
+export const STORE_CACHE_SLOTS = Number(storeCacheSlots);
+if (
+  storeCacheSlots.trim() === "" ||
+  !Number.isSafeInteger(STORE_CACHE_SLOTS) ||
+  STORE_CACHE_SLOTS < 0
+) {
+  throw new Error("STORE_CACHE_SLOTS must be a non-negative safe integer");
+}
+
 if (!KEEP_DOWNLOADED_FILES) fs.emptyDirSync(DOWNLOAD_DIR);
 
 // Maximum number of connections per torrent (default 50)
