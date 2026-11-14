@@ -18,6 +18,7 @@ interface StoreOptions {
   path?: string;
   files?: { path: string; length: number; offset?: number }[];
   length?: number;
+  assemblyBatchBytes?: number;
 }
 
 const instances = new Map<string, PieceFileStore>();
@@ -64,6 +65,8 @@ const isStoreOptions = (value: unknown): value is StoreOptions => {
     !("torrent" in value) || !isStoreTorrent(value.torrent)) return false;
   if ("path" in value && value.path !== undefined && typeof value.path !== "string") return false;
   if ("length" in value && value.length !== undefined && typeof value.length !== "number") return false;
+  if ("assemblyBatchBytes" in value && value.assemblyBatchBytes !== undefined &&
+    (!Number.isSafeInteger(value.assemblyBatchBytes) || Number(value.assemblyBatchBytes) <= 0)) return false;
   return "files" in value && Array.isArray(value.files) && value.files.every((file: unknown) =>
     typeof file === "object" && file !== null &&
     "path" in file && typeof file.path === "string" &&
@@ -79,6 +82,7 @@ export class PieceFileStore extends FSStore {
   private readonly directory: string;
   declare chunkLength: number;
   private readonly totalPieces: number;
+  private readonly assemblyBatchBytes: number;
   private cursor = 0;
   private stopping = false;
   private status = "downloading";
@@ -99,6 +103,7 @@ export class PieceFileStore extends FSStore {
     super(chunkLength, options);
     this.torrent = options.torrent;
     this.totalPieces = Math.ceil(this.length / chunkLength);
+    this.assemblyBatchBytes = options.assemblyBatchBytes ?? 64 * 1024 * 1024;
     let parent = this.files.length ? path.dirname(this.files[0].path) : options.path;
     if (!parent) throw new Error("Piece-file storage requires an output directory");
     for (const file of this.files) {
@@ -266,26 +271,35 @@ export class PieceFileStore extends FSStore {
       this.cursor = this.totalPieces;
     }
     while (this.cursor < this.totalPieces && !this.stopping) {
-      const index = this.cursor;
-      let data: Buffer;
-      try {
-        data = await fs.readFile(this.piecePath(index));
-      } catch (error) {
-        if (!missing(error)) throw error;
-        data = await this.readFinal(index);
-        if (createHash("sha1").update(data).digest("hex") !== this.torrent._hashes?.[index]) {
-          throw new Error(`Missing or corrupted assembly piece ${index}`);
+      const first = this.cursor;
+      let next = first;
+      let batchBytes = 0;
+      // Batches keep writes sequential while paying the slow USB/exFAT durability cost once per batch.
+      while (next < this.totalPieces && !this.stopping && (next === first || batchBytes < this.assemblyBatchBytes)) {
+        let data: Buffer;
+        try {
+          data = await fs.readFile(this.piecePath(next));
+        } catch (error) {
+          if (!missing(error)) throw error;
+          data = await this.readFinal(next);
+          if (createHash("sha1").update(data).digest("hex") !== this.torrent._hashes?.[next]) {
+            throw new Error(`Missing or corrupted assembly piece ${next}`);
+          }
         }
+        // Only ascending, contiguous writes reach the movie files; far-offset pieces stay in the spool.
+        await new Promise<void>((resolve, reject) => {
+          super.put(next, data, (error: Error | null) => error ? reject(error) : resolve());
+        });
+        batchBytes += data.length;
+        next++;
       }
-      // Only ascending, contiguous writes reach the movie files; far-offset pieces stay in the spool.
-      await new Promise<void>((resolve, reject) => {
-        super.put(index, data, (error: Error | null) => error ? reject(error) : resolve());
-      });
-      await this.syncOutput(index);
       if (this.stopping) return;
-      if (this.cursor === index) this.cursor = index + 1;
+      await this.syncOutput(first, next);
+      if (this.stopping) return;
+      if (this.cursor !== first) continue;
+      this.cursor = next;
       await this.saveCursor();
-      await fs.rm(this.piecePath(index), { force: true });
+      for (let index = first; index < next; index++) await fs.rm(this.piecePath(index), { force: true });
     }
     if (!this.stopping) {
       for (const file of this.files) {
@@ -304,9 +318,9 @@ export class PieceFileStore extends FSStore {
     }
   }
 
-  private async syncOutput(index: number) {
-    const start = index * this.chunkLength;
-    const end = start + this.pieceSize(index);
+  private async syncOutput(first: number, next: number) {
+    const start = first * this.chunkLength;
+    const end = Math.min(this.length, next * this.chunkLength);
     for (const file of this.files) {
       if (file.offset >= end || file.offset + file.length <= start) continue;
       const handle = await fs.open(file.path, "r+");

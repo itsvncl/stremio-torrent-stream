@@ -108,7 +108,7 @@ test("interrupted materialization retains pieces and repairs a previously materi
   const directory = await temporary(t);
   const chunks = [Buffer.from("abcd"), Buffer.from("efgh"), Buffer.from("ij")];
   const torrent = makeTorrent(chunks);
-  const options = { path: directory, torrent, files: [{ path: "a", length: 10 }] };
+  const options = { path: directory, torrent, files: [{ path: "a", length: 10 }], assemblyBatchBytes: 8 };
   let store = new PieceFileStore(4, options);
   t.after(() => close(store));
   for (let index = 0; index < chunks.length; index++) await put(store, index, chunks[index]);
@@ -133,8 +133,8 @@ test("interrupted materialization retains pieces and repairs a previously materi
   const stopped = close(store);
   release();
   await stopped;
-  assert.equal((await fs.stat(path.join(directory, "a"))).size, 8);
-  assert.equal(store.getStats().assembledPieces, 1);
+  assert.equal(store.getStats().assembledPieces, 2);
+  assert.equal(syncCalls, 2, "Two four-byte pieces must share one durability flush");
   const output = await original(path.join(directory, "a"), "r+");
   await output.write(Buffer.from("XXXX"), 0, 4, 0);
   await output.close();
