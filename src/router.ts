@@ -50,7 +50,7 @@ router.get("/data/folders", (_, res) => {
   }
 });
 
-router.delete("/data/folders/:name", (req, res) => {
+router.delete("/data/folders/:name", async (req, res) => {
   const { name } = req.params;
   const { password } = req.body; // or req.query if you prefer query param
 
@@ -60,7 +60,7 @@ router.delete("/data/folders/:name", (req, res) => {
   }
 
   try {
-    deleteFolder(name);
+    await deleteFolder(name);
     res.json({ message: `Folder '${name}' deleted successfully.` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

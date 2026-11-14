@@ -4,6 +4,7 @@ import path from "path";
 import { createRequire } from "module";
 import WebTorrent, { Torrent } from "webtorrent";
 import { DownloadBudget } from "./download-budget.js";
+import { createPieceFileStore, getPieceStorageStats } from "./piece-file-store.js";
 import { getReadableDuration } from "../utils/file.js";
 import { getTorrentHash } from "../utils/torrent.js";
 import {
@@ -16,6 +17,7 @@ import {
   MAX_CONNS_PER_TORRENT,
   STORE_CACHE_SLOTS,
   DOWNLOAD_BUFFER_LIMIT,
+  DISK_STORE_MODE,
   DOWNLOAD_SPEED_LIMIT,
   UPLOAD_SPEED_LIMIT,
   SEED_TIME,
@@ -48,6 +50,7 @@ export interface TorrentInfo {
 }
 
 interface ActiveTorrentInfo extends TorrentInfo {
+  storage?: ReturnType<typeof getPieceStorageStats>;
   pieceLength: number;
   progress: number;
   downloaded: number;
@@ -104,11 +107,13 @@ export const getStats = () => ({
   storeCacheSlots: STORE_CACHE_SLOTS,
   webtorrentVersion,
   downloadBudget: downloadBudget.getStats(),
+  diskStoreMode: DISK_STORE_MODE,
   openStreams: [...openStreams.values()].reduce((a, b) => a + b, 0),
   downloadSpeed: streamClient.downloadSpeed,
   uploadSpeed: streamClient.uploadSpeed,
   activeTorrents: streamClient.torrents.map<ActiveTorrentInfo>((torrent) => ({
     name: torrent.name,
+    storage: getPieceStorageStats(torrent.infoHash),
     infoHash: torrent.infoHash,
     size: torrent.length,
     pieceLength: torrent.pieceLength,
@@ -142,6 +147,7 @@ export const getOrAddTorrent = (uri: string, infoHash: string = "") =>
       path: DOWNLOAD_DIR,
       destroyStoreOnDestroy: !KEEP_DOWNLOADED_FILES,
       storeCacheSlots: STORE_CACHE_SLOTS,
+      ...(DISK_STORE_MODE === "piece-files" ? { store: createPieceFileStore } : {}),
     };
 
     if (!KEEP_DOWNLOADED_FILES) {
@@ -274,6 +280,12 @@ export const saveOrGetTorrentFile = async (uri: string, filePath: string) => {
     return seedPath;
   }
 
+  const torrentPath = path.join(TORRENT_FILE_DIR, torrentFilename);
+  if (fs.existsSync(torrentPath)) {
+    await fs.copy(torrentPath, seedPath);
+    return seedPath;
+  }
+
   const torrentBuffer = await fetch(uri).then((res) => res.arrayBuffer());
 
   if (!fs.existsSync(seedPath)) {
@@ -281,7 +293,6 @@ export const saveOrGetTorrentFile = async (uri: string, filePath: string) => {
   }
 
   if (KEEP_TORRENT_FILES) {
-    const torrentPath = path.join(TORRENT_FILE_DIR, torrentFilename);
     if (!fs.existsSync(torrentPath)) await fs.copy(seedPath, torrentPath);
   }
 
@@ -309,58 +320,33 @@ export const seedDirectory = async () => {
     if (await streamClient.get(hash)) continue;
 
     console.log(`Initializing torrent for seeding: ${file}`);
-    streamClient.add(filePath, { path: DOWNLOAD_DIR, storeCacheSlots: STORE_CACHE_SLOTS }, (torrent) => {
+    streamClient.add(filePath, { path: DOWNLOAD_DIR, storeCacheSlots: STORE_CACHE_SLOTS,
+      ...(DISK_STORE_MODE === "piece-files" ? { store: createPieceFileStore } : {}),
+    }, (torrent) => {
       console.log(`Seeding torrent: ${file}`);
       scheduleTorrentTimeout(torrent.infoHash);
     });
   }
 };
 
-export async function deleteActiveTorrent(folderName: string, retries = 10): Promise<void> {
+export async function deleteActiveTorrent(folderName: string): Promise<void> {
   console.log(`Trying to manually delete: ${folderName}.torrent`);
   const torrent = streamClient.torrents.find(t => t.name === folderName);
   if (!torrent) return;
 
   const hash = torrent.infoHash;
 
-  const count = openStreams.get(hash) || 1;
-  openStreams.set(hash, count - 1);
-
-  if (count > 1) {
-    if (retries > 0) {
-      console.log(`Streams still open for ${folderName}, retrying deletion in 5s... (${retries} retries left)`);
-      setTimeout(() => deleteActiveTorrent(folderName, retries - 1), 5000);
-    } else {
-      console.log(`Max retries reached, skipping deletion for ${folderName}`);
-    }
-    return;
-  }
-
   openStreams.delete(hash);
 
-  let timeout = timeouts.get(hash);
+  const timeout = timeouts.get(hash);
   if (timeout) {
     clearTimeout(timeout);
     timeouts.delete(hash);
   }
 
-  timeout = setTimeout(async () => {
-    await handleTorrentTimeout(hash);
-
-    const torrentFilePath = path.join(TORRENT_FILE_DIR, `${folderName}.torrent`);
-    if (fs.existsSync(torrentFilePath)) {
-      try {
-        await fs.remove(torrentFilePath);
-        console.log(`Deleted torrent file: ${folderName}.torrent`);
-      } catch (error: any) {
-        console.error(`Failed to delete torrent file: ${folderName}, error: ${error.message}`);
-      }
-    }
-
-    timeouts.delete(hash);
-  }, 1000);
-
-  timeouts.set(hash, timeout);
+  await new Promise<void>((resolve, reject) => {
+    torrent.destroy({ destroyStore: false }, (error) => error ? reject(error) : resolve());
+  });
 }
 
 //Starts the seeding process if AUTO_SEED is true

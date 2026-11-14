@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { DOWNLOAD_DIR, SEED_DIR, TORRENT_FILE_DIR } from "../torrent/constats.js";
 import { deleteActiveTorrent } from "../torrent/webtorrent.js";
+import { waitForPieceStorage } from "../torrent/piece-file-store.js";
 
 export interface DiskStats {
   mountPoint: string;
@@ -52,7 +53,7 @@ export function listFolders(rootPath: string = DOWNLOAD_DIR): FolderInfo[] {
       const folderPath = path.join(rootPath, entry.name);
 
       // Skip if full path is in excluded list
-      if (EXCLUDE_FOLDERS.includes(folderPath)) continue;
+      if (EXCLUDE_FOLDERS.includes(folderPath) || entry.name.startsWith(".stremio-pieces-")) continue;
 
       const sizeBytes = getFolderSizeBytes(folderPath);
 
@@ -67,16 +68,18 @@ export function listFolders(rootPath: string = DOWNLOAD_DIR): FolderInfo[] {
 }
 
 // Delete a folder by name and also remove corresponding .torrent file
-export function deleteFolder(folderName: string, rootPath: string = DOWNLOAD_DIR): void {
+export async function deleteFolder(folderName: string, rootPath: string = DOWNLOAD_DIR): Promise<void> {
   const folderPath = path.join(rootPath, folderName);
-  deleteActiveTorrent(folderName);
-  if (EXCLUDE_FOLDERS.includes(folderPath)) {
+  if (EXCLUDE_FOLDERS.includes(folderPath) || folderName.startsWith(".stremio-pieces-")) {
     throw new Error(`Cannot delete protected folder: ${folderName}`);
   }
 
   if (!fs.existsSync(folderPath)) {
     throw new Error(`Folder not found: ${folderName}`);
   }
+
+  await deleteActiveTorrent(folderName);
+  await waitForPieceStorage(folderPath);
 
   // Delete folder
   fs.removeSync(folderPath);

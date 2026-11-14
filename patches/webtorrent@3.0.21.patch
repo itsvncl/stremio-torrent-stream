@@ -13,7 +13,7 @@ index 8d3d1561eadcab7d8dc8ddffc71cf8342660bff9..4f3c56eb7b1e8f0ed7dfe70ccfc49bb5
        this.peerId = opts.peerId
      } else if (ArrayBuffer.isView(opts.peerId)) {
 diff --git a/lib/torrent.js b/lib/torrent.js
-index 771a87fa5004f5ff82e9b5c3d9d8b0d70e110dbf..c37134eed66b94a0cbb7084257b8e8ce5aed7e19 100644
+index 771a87fa5004f5ff82e9b5c3d9d8b0d70e110dbf..ce62724c1f8eea7f795d93d45361e7035f3185bd 100644
 --- a/lib/torrent.js
 +++ b/lib/torrent.js
 @@ -956,6 +956,8 @@ export default class Torrent extends EventEmitter {
@@ -42,6 +42,15 @@ index 771a87fa5004f5ff82e9b5c3d9d8b0d70e110dbf..c37134eed66b94a0cbb7084257b8e8ce
      if (!wire.downloaded) return validateWire()
  
      trySelectWire(false) || trySelectWire(true)
+@@ -1680,7 +1692,7 @@ export default class Torrent extends EventEmitter {
+             tries += 1
+           }
+         } else {
+-          for (piece = next.to; piece >= next.from + next.offset; --piece) {
++          for (piece = next.from + next.offset; piece <= next.to; ++piece) {
+             if (!wire.peerPieces.get(piece)) continue
+             if (self._request(wire, piece, false)) return
+           }
 @@ -1920,8 +1932,30 @@ export default class Torrent extends EventEmitter {
    /**
     * Attempts to request a block from the given wire.

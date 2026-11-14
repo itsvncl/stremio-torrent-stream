@@ -65,7 +65,10 @@ export class DownloadBudget {
 
   setPhase(piece: BudgetPiece, phase: Phase) {
     const entry = this.entries.get(piece);
-    if (entry) entry.phase = phase;
+    if (entry) {
+      entry.phase = phase;
+      entry.updatedAt = Date.now();
+    }
   }
 
   release(piece: BudgetPiece) {
@@ -96,12 +99,16 @@ export class DownloadBudget {
     let partialBytes = 0;
     let hashingBytes = 0;
     let pendingWriteBytes = 0;
+    let oldestPendingWriteMs = 0;
     let effectiveLimitBytes = this.limitBytes;
     for (const entry of this.entries.values()) {
       effectiveLimitBytes = Math.max(effectiveLimitBytes, entry.cost);
       if (entry.phase === "partial") partialBytes += entry.piece.length - entry.piece.missing;
       if (entry.phase === "hashing") hashingBytes += entry.piece.length;
-      if (entry.phase === "writing") pendingWriteBytes += entry.piece.length;
+      if (entry.phase === "writing") {
+        pendingWriteBytes += entry.piece.length;
+        oldestPendingWriteMs = Math.max(oldestPendingWriteMs, Date.now() - entry.updatedAt);
+      }
     }
     return {
       limitBytes: this.limitBytes,
@@ -110,6 +117,7 @@ export class DownloadBudget {
       partialBytes,
       hashingBytes,
       pendingWriteBytes,
+      oldestPendingWriteMs,
       activePieces: this.entries.size,
       waitingTorrents: [...this.waiters].filter((torrent) => !torrent.destroyed && !torrent.done).length,
       discardedPartialPieces: this.discardedPartialPieces,

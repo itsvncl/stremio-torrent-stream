@@ -46,12 +46,17 @@
             }
             document.getElementById('storeCacheSlots').innerText = `${data.storeCacheSlots} pieces per torrent`;
             document.getElementById('webtorrentVersion').innerText = data.webtorrentVersion || 'Backend update required';
+            document.getElementById('diskStoreMode').innerText = data.diskStoreMode || 'Backend update required';
             const budget = data.downloadBudget;
             for (const key of ['reservedBytes', 'effectiveLimitBytes', 'partialBytes', 'hashingBytes', 'pendingWriteBytes']) {
                 document.getElementById(`budget-${key}`).innerText = budget ? `${bytesToMB(budget[key])} MiB` : 'Backend update required';
             }
+            document.getElementById('budget-oldestPendingWrite').innerText = Number.isFinite(budget?.oldestPendingWriteMs)
+                ? `${Math.ceil(budget.oldestPendingWriteMs / 1000)} s` : 'Backend update required';
             document.getElementById('budgetStatus').innerText = !budget
                 ? 'Download backpressure unavailable: deploy the updated backend.'
+                : budget.oldestPendingWriteMs >= 30000
+                    ? `A disk write has waited ${Math.ceil(budget.oldestPendingWriteMs / 1000)} seconds. Storage is holding download capacity; this is not a file lock.`
                 : budget.waitingTorrents > 0
                     ? `Backpressure active: ${budget.waitingTorrents} torrent(s) waiting for active pieces / disk writes.`
                     : `Within budget: ${budget.activePieces} active piece(s).`;
@@ -91,6 +96,12 @@
                         </div>
                     </div>
                 `;
+                if (torrent.storage) {
+                    const storage = document.createElement('p');
+                    storage.classList.add('text-gray-400', 'mt-4');
+                    storage.textContent = `Storage: ${torrent.storage.mode}; ${torrent.storage.status}; materialized ${torrent.storage.assembledPieces}/${torrent.storage.totalPieces} pieces${torrent.storage.error ? `; ERROR: ${torrent.storage.error}` : ''}`;
+                    torrentElement.appendChild(storage);
+                }
     
                 // Add Files
                 if (torrent.files.length > 0) {
@@ -193,6 +204,10 @@
                     <p class="font-medium text-gray-400">WebTorrent Version</p>
                     <p class="text-lg font-semibold text-gray-200" id="webtorrentVersion">Loading...</p>
                 </div>
+                <div>
+                    <p class="font-medium text-gray-400">Disk Storage Backend</p>
+                    <p class="text-lg font-semibold text-gray-200" id="diskStoreMode">Loading...</p>
+                </div>
             </div>
             <p class="text-sm text-gray-400 mt-4">
                 Process memory is not Docker/host memory usage and does not include filesystem cache or swapped-out pages in RSS.
@@ -210,6 +225,7 @@
                 <div><p class="text-gray-400">Received Partial-Piece Data</p><p id="budget-partialBytes">Loading...</p></div>
                 <div><p class="text-gray-400">Pieces Being Hashed</p><p id="budget-hashingBytes">Loading...</p></div>
                 <div><p class="text-gray-400">Pieces Awaiting Disk Callbacks</p><p id="budget-pendingWriteBytes">Loading...</p></div>
+                <div><p class="text-gray-400">Oldest Pending Disk Write</p><p id="budget-oldestPendingWrite">Loading...</p></div>
             </div>
             <p id="budgetStatus" role="status" class="mt-4">Loading...</p>
             <p class="text-sm text-gray-400 mt-4">Capacity is reserved before requesting pieces and includes assembly-copy headroom.

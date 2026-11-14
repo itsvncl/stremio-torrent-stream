@@ -46,7 +46,19 @@ if (downloadBufferLimit.trim() === "" || !Number.isSafeInteger(DOWNLOAD_BUFFER_L
   throw new Error("DOWNLOAD_BUFFER_LIMIT must be a positive safe integer");
 }
 
+const diskStoreMode = process.env.DISK_STORE_MODE ?? "auto";
+if (!["auto", "direct", "piece-files"].includes(diskStoreMode)) {
+  throw new Error("DISK_STORE_MODE must be auto, direct or piece-files");
+}
 if (!KEEP_DOWNLOADED_FILES) fs.emptyDirSync(DOWNLOAD_DIR);
+
+const resolveDiskStoreMode = () => {
+  if (diskStoreMode === "piece-files") return "piece-files";
+  if (diskStoreMode === "direct" || process.platform !== "linux") return "direct";
+  fs.ensureDirSync(DOWNLOAD_DIR);
+  return fs.statfsSync(DOWNLOAD_DIR).type === 0x2011bab0 ? "piece-files" : "direct";
+};
+export const DISK_STORE_MODE = resolveDiskStoreMode();
 
 // Maximum number of connections per torrent (default 50)
 export const MAX_CONNS_PER_TORRENT =

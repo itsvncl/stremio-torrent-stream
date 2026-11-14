@@ -66,5 +66,7 @@ export const isTorrentStoredLocally = (filePath: string) => {
   const seedPath = path.join(SEED_DIR, torrentFilename);
   const torrentPath = path.join(TORRENT_FILE_DIR, torrentFilename);
 
-  return !fs.existsSync(seedPath) && fs.existsSync(torrentPath) && fs.existsSync(path.join(DOWNLOAD_DIR, filePath));
+  const fullPath = path.join(DOWNLOAD_DIR, filePath);
+  return !fs.existsSync(seedPath) && fs.existsSync(torrentPath) && fs.existsSync(fullPath)
+    && !fs.existsSync(`${fullPath}.stremio-incomplete`);
 }
