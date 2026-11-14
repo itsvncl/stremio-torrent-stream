@@ -59,6 +59,8 @@ router.get("/stream/:torrentUri/:filePath", async (req, res) => {
   const torrent = await getOrAddTorrent(uri);
   if (!torrent) return res.status(500).send("Failed to add torrent");
 
+  if (req.aborted || res.destroyed) return;
+
   const file = getFile(torrent, filePath);
   if (!file) return res.status(404).send("File not found");
 
@@ -84,34 +86,46 @@ router.get("/stream/:torrentUri/:filePath", async (req, res) => {
   res.writeHead(206, headers);
 
   try {
+    file.select();
+    const videoStream = file.createReadStream({ start, end });
+
     const noDataTimeout = setTimeout(() => {
-      res.status(500).end();
+      res.destroy();
     }, 10000);
 
     const noReadTimeout = setTimeout(() => {
-      res.status(200).end();
+      res.destroy();
     }, 60000);
 
-    const videoStream = file.createReadStream({ start, end });
+    let closed = false;
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(noDataTimeout);
+      clearTimeout(noReadTimeout);
+      res.removeListener("close", cleanup);
+      res.removeListener("finish", cleanup);
+      videoStream.unpipe(res);
+      videoStream.destroy();
+      streamClosed(torrent.infoHash, file.name);
+    };
 
     videoStream.on("data", () => {
       clearTimeout(noDataTimeout);
-    });
-
-    videoStream.on("readable", () => {
       noReadTimeout.refresh();
     });
 
-    videoStream.on("error", (error) => {});
-
-    videoStream.pipe(res);
+    videoStream.once("error", () => {
+      cleanup();
+      res.destroy();
+    });
 
     streamOpened(torrent.infoHash, file.name);
+    res.once("close", cleanup);
+    res.once("finish", cleanup);
 
-    res.on("close", () => {
-      streamClosed(torrent.infoHash, file.name);
-    });
+    videoStream.pipe(res);
   } catch (error) {
-    res.status(500).end();
+    res.destroy();
   }
 });
